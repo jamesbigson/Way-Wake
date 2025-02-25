@@ -1,0 +1,35 @@
+<menu xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:background="@color/white"
+    >
+
+    <item
+        android:id="@+id/nav_home"
+        android:icon="@drawable/nav_item_home"
+        android:title="Home"
+        app:showAsAction="ifRoom" />
+
+    <item
+        android:id="@+id/nav_favorites"
+        android:icon="@drawable/nav_item_favorite"
+        android:title="Favorites"
+        app:showAsAction="ifRoom"/>
+
+    <item
+        android:id="@+id/nav_set_alarm"
+        android:icon="@drawable/nav_item_setalarm"
+        android:title="Set Alarm"
+        app:showAsAction="ifRoom" />
+
+    <item
+        android:id="@+id/nav_history"
+        android:icon="@drawable/nav_item_history"
+        android:title="History"
+        app:showAsAction="ifRoom" />
+
+    <item
+        android:id="@+id/nav_settings"
+        android:icon="@drawable/nav_item_settings"
+        android:title="Settings"
+        app:showAsAction="ifRoom" />
+</menu>
