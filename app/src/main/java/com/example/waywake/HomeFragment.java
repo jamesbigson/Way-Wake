@@ -211,6 +211,8 @@ public class HomeFragment extends Fragment {
 
                 // Display latitude and longitude
                 mapView.getController().animateTo(new GeoPoint(latitude,longitude));
+//                locationOverlay.disableFollowLocation();
+
             } else {
                 Toast.makeText(requireContext(), "Location not found", Toast.LENGTH_SHORT).show();
             }
@@ -234,6 +236,7 @@ public class HomeFragment extends Fragment {
     }
 
     private void run() {
+
         // Move the map to the current location on the first fix
         GeoPoint currentLocation = locationOverlay.getMyLocation();
 

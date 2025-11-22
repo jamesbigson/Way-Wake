@@ -37,6 +37,7 @@ public class SelectAlarmSound extends AppCompatActivity {
     private static final int AUDIO_PERMISSION_CODE = 102;
     public static final int DEFAULT_SOUNDS = 4;
     private SharedPreferences sharedPreferences;
+    private SharedPreferences.Editor editor;
     private static final String PREFS_NAME = "user_settings";
     private static final String KEY_SOUND_LIST = "sound_LIST";
 
@@ -53,6 +54,7 @@ public class SelectAlarmSound extends AppCompatActivity {
 
         // Initialize SharedPreferences
         sharedPreferences = getSharedPreferences(PREFS_NAME, MODE_PRIVATE);
+        editor = sharedPreferences.edit();
 
 
         // Sample sound list (use your actual sound names in the raw folder)
@@ -166,7 +168,7 @@ public class SelectAlarmSound extends AppCompatActivity {
         Set<String> soundSet = sharedPreferences.getStringSet(KEY_SOUND_LIST , new HashSet<>());
 
 
-        if (!soundSet.isEmpty()) {
+        if (soundSet != null && !soundSet.isEmpty()) {
             for (String item : soundSet) {
                 soundList.add(item);
                 adapter.notifyDataSetChanged();

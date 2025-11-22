@@ -45,6 +45,7 @@ public class HistoryFragment extends Fragment {
         adapter = new HistoryAdapter(historyList);
         rvHistory.setAdapter(adapter);
 
+
         btnClearHistory.setOnClickListener(v -> {
             showClearHistoryConfirmation();
         });

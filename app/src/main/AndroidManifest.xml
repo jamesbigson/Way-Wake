@@ -13,7 +13,9 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_LOCATION" />
     <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />
     <uses-permission android:name="android.permission.READ_MEDIA_AUDIO" />
-    <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW"/>
+    <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
+
+
     <uses-permission
         android:name="android.permission.MANAGE_EXTERNAL_STORAGE"
         tools:ignore="ScopedStorage" />
@@ -29,6 +31,9 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.MyLocation"
         tools:targetApi="31">
+        <activity
+            android:name=".Search_page"
+            android:exported="false" />
         <activity
             android:name=".checkPermission"
             android:exported="false" />
@@ -49,6 +54,9 @@
             android:exported="false" />
         <activity
             android:name=".SelectAlarmSound"
+            android:exported="false" />
+        <activity
+            android:name=".AlarmSettings"
             android:exported="false" />
         <activity
             android:name=".MainPage"

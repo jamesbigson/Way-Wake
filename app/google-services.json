@@ -1,0 +1,30 @@
+{
+  "project_info": {
+    "project_number": "372829526126",
+    "firebase_url": "https://way-wake-default-rtdb.firebaseio.com",
+    "project_id": "way-wake",
+    "storage_bucket": "way-wake.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:372829526126:android:f71c30465609992c22ae7f",
+        "android_client_info": {
+          "package_name": "com.example.waywake"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAtF4fib1Jp_XN9gV6ks6CPbSpJ43W6KZw"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

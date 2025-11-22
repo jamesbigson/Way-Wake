@@ -2,6 +2,7 @@ package com.example.waywake;
 
 import static com.example.waywake.AlarmFragment.LOCATION_PERMISSION_REQUEST_CODE;
 import static com.example.waywake.AlarmFragment.PERMISSION_REQUEST_CODE;
+import com.example.waywake.BuildConfig;
 
 import android.Manifest;
 import android.app.AlertDialog;
@@ -11,9 +12,11 @@ import android.content.IntentFilter;
 import android.content.pm.PackageManager;
 import android.location.LocationManager;
 import android.net.ConnectivityManager;
+import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
 import android.provider.Settings;
+import android.util.Log;
 import android.view.View;
 import android.widget.TextView;
 
@@ -27,6 +30,10 @@ import com.google.android.gms.location.LocationSettingsRequest;
 import com.google.android.gms.location.SettingsClient;
 import com.google.android.material.bottomnavigation.BottomNavigationView;
 import com.google.android.material.snackbar.Snackbar;
+
+import com.google.firebase.FirebaseApp;
+import com.google.firebase.remoteconfig.FirebaseRemoteConfig;
+import com.google.firebase.remoteconfig.FirebaseRemoteConfigSettings;
 
 import org.osmdroid.config.Configuration;
 
@@ -91,7 +98,60 @@ public class MainPage extends AppCompatActivity implements NetworkChangeReceiver
                 createViewPager();
             }
         });
+
+
+        FirebaseApp.initializeApp(this);
+        FirebaseRemoteConfig mConfig = FirebaseRemoteConfig.getInstance();
+
+        FirebaseRemoteConfigSettings configSettings =
+                new FirebaseRemoteConfigSettings.Builder()
+                        .setMinimumFetchIntervalInSeconds(3600)
+                        .build();
+        mConfig.setConfigSettingsAsync(configSettings);
+
+        mConfig.fetchAndActivate()
+                .addOnCompleteListener(task -> {
+                    if (task.isSuccessful()) {
+                        checkForUpdate();
+                    }else{
+                        checkForUpdate();
+                    }
+                });
+
     }
+
+    private void checkForUpdate() {
+        FirebaseApp.initializeApp(this);
+        FirebaseRemoteConfig mConfig = FirebaseRemoteConfig.getInstance();
+
+        boolean forceUpdate = mConfig.getBoolean("force_update");
+        String latestVersion = mConfig.getString("latest_version");
+        String updateMessage = mConfig.getString("update_message");
+        String updateUrl = mConfig.getString("update_url");
+
+
+        String currentVersion = BuildConfig.VERSION_NAME;
+
+        if (forceUpdate || !currentVersion.equals(latestVersion)) {
+            showUpdatePopup(updateMessage, updateUrl);
+        }
+    }
+
+    private void showUpdatePopup(String msg, String url) {
+        AlertDialog.Builder dialog = new AlertDialog.Builder(this);
+        dialog.setTitle("Update Required");
+        dialog.setMessage(msg);
+
+        dialog.setCancelable(false);  // cannot close
+
+        dialog.setPositiveButton("Update", (d, which) -> {
+            startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse(url)));
+        });
+
+        dialog.show();
+    }
+
+
 
     private void createViewPager() {
         // Set up ViewPager2 adapter
@@ -117,6 +177,7 @@ public class MainPage extends AppCompatActivity implements NetworkChangeReceiver
 
     @Override
     protected void onResume() {
+//        checkForUpdate();
         if(isLocationEnabled()){
             createViewPager();
         }

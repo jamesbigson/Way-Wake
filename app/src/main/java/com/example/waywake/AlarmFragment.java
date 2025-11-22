@@ -5,12 +5,14 @@ import static android.content.Context.MODE_PRIVATE;
 import static android.content.Context.NOTIFICATION_SERVICE;
 import static android.content.Context.VIBRATOR_SERVICE;
 
-import static com.example.waywake.AlarmSettingsFragment.KEY_ALARM_SOUND;
-import static com.example.waywake.AlarmSettingsFragment.KEY_DISTANCE_UNIT;
-import static com.example.waywake.AlarmSettingsFragment.KEY_VIBRATION;
+import static com.example.waywake.AlarmSettings.KEY_ALARM_SOUND;
+import static com.example.waywake.AlarmSettings.KEY_DISTANCE_UNIT;
+import static com.example.waywake.AlarmSettings.KEY_VIBRATION;
 
 import android.Manifest;
 import android.annotation.SuppressLint;
+import android.app.Activity;
+import android.app.ActivityOptions;
 import android.app.AlertDialog;
 import android.app.NotificationChannel;
 import android.app.NotificationManager;
@@ -46,12 +48,15 @@ import android.widget.SeekBar;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import androidx.activity.result.ActivityResultLauncher;
+import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.constraintlayout.widget.ConstraintLayout;
 import androidx.core.app.ActivityCompat;
 
 import org.osmdroid.config.Configuration;
+import org.osmdroid.util.BoundingBox;
 import org.osmdroid.util.GeoPoint;
 import org.osmdroid.views.MapView;
 
@@ -62,6 +67,7 @@ import org.osmdroid.views.overlay.compass.CompassOverlay;
 import org.osmdroid.views.overlay.mylocation.MyLocationNewOverlay;
 
 import java.io.IOException;
+import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
@@ -70,6 +76,7 @@ import java.util.Set;
 import android.os.Vibrator;
 import android.view.View;
 
+import androidx.core.app.ActivityOptionsCompat;
 import androidx.core.app.NotificationCompat;
 import androidx.fragment.app.Fragment;
 
@@ -106,8 +113,9 @@ public class AlarmFragment extends Fragment {
     private static final String CHANNEL_ID = "location_alarm_channel";
     private boolean isShowingLocation = false;
     private boolean isAlarmRinging = false;
-    private boolean showMyLocation = false;
+    private boolean showMyLocation = true;
     private CompassOverlay compassOverlay;
+    ActivityResultLauncher<Intent> searchLauncher;
     private static final String HISTORY_PREF_NAME = "history_pref";
     public static final int LOCATION_PERMISSION_REQUEST_CODE = 1001;
     public static final String USER_SETTINGS_PREFS_NAME = "user_settings";
@@ -127,6 +135,7 @@ public class AlarmFragment extends Fragment {
         setAlarmButton = view.findViewById(R.id.set_alarm_button);
         radiusLabel = view.findViewById(R.id.radius_label);
         vibrator = (Vibrator) requireContext().getSystemService(VIBRATOR_SERVICE);
+//        testBtn = view.findViewById(R.id.tv_set_alarm_title);
 //        autoCompleteTextView = view.findViewById(R.id.autoCompleteTextView);
 
         SeekBar radiusSeekBar = view.findViewById(R.id.radius_seekbar);
@@ -143,6 +152,7 @@ public class AlarmFragment extends Fragment {
         distanceUnit = userSettingsSP.getString(KEY_DISTANCE_UNIT, "Meter" );
 
         mapView.setMultiTouchControls(true);
+        myLocationButton.setSelected(true);
 
         try {
             checkPermissions();
@@ -156,7 +166,14 @@ public class AlarmFragment extends Fragment {
             destRadius = 20000;
         }
 
+        // Start the foreground service for background tracking
+        startLocationService();
         createNotificationChannel();
+
+//        testBtn.setOnClickListener(v -> {
+//            Intent i = new Intent(requireContext(),Search_page.class);
+//            startActivity(i);
+//        });
 
         myLocationButton.setOnClickListener(v -> {
             boolean isSelected = !myLocationButton.isSelected();
@@ -195,8 +212,15 @@ public class AlarmFragment extends Fragment {
                 imm.hideSoftInputFromWindow(locationInput.getWindowToken(), 0);
             }
 
-            // Start the foreground service for background tracking
-            startLocationService();
+
+            if (myLocationButton.isSelected()) {
+                myLocationButton.callOnClick();
+            }
+
+            locationOverlay.disableFollowLocation();
+
+//            mapView.callOnClick();
+
 
             String locationName = locationInput.getText().toString();
 
@@ -255,6 +279,28 @@ public class AlarmFragment extends Fragment {
         mapLocationButton.setOnClickListener(v -> {
             Intent intent = new Intent(requireContext(), SelectMapLocation.class);
             startActivityForResult(intent, 200);
+        });
+
+
+        // Register launcher
+        searchLauncher = registerForActivityResult(
+                new ActivityResultContracts.StartActivityForResult(),
+                result -> {
+                    if (result.getResultCode() == Activity.RESULT_OK) {
+                        Intent data = result.getData();
+                        if (data != null) {
+                            String place = data.getStringExtra("selected_place");
+                            locationInput.setText(place);   // Set the returned text
+                            setAlarmButton.callOnClick();
+                        }
+                    }
+                }
+        );
+
+        // Open SearchActivity when clicked
+        locationInput.setOnClickListener(v -> {
+            Intent intent = new Intent(getActivity(), Search_page.class);
+            searchLauncher.launch(intent);
         });
 
         locationInput.setOnEditorActionListener((v, actionId, event) -> {
@@ -565,7 +611,6 @@ public class AlarmFragment extends Fragment {
 
     void stopAlarm(){
         if(isAlarmRinging){
-            stopBackgroundService();
             stopSound();
             stopVibration();
             isAlarmRinging=false;
@@ -583,10 +628,10 @@ public class AlarmFragment extends Fragment {
         dialog.getWindow().setBackgroundDrawableResource(android.R.color.transparent);
 
 
-        dialogView.findViewById(R.id.snooze_button).setOnClickListener(v -> {
-            stopAlarm();
-            dialog.dismiss();
-        });
+//        dialogView.findViewById(R.id.snooze_button).setOnClickListener(v -> {
+//            stopAlarm();
+//            dialog.dismiss();
+//        });
         dialogView.findViewById(R.id.stop_button).setOnClickListener(v -> {
             stopAlarm();
             dialog.dismiss();
@@ -612,6 +657,7 @@ public class AlarmFragment extends Fragment {
     }
 
     private void run() {
+
         // Move the map to the current location on the first fix
         GeoPoint currentLocation = locationOverlay.getMyLocation();
 
@@ -695,10 +741,19 @@ public class AlarmFragment extends Fragment {
                 double longitude = address.getLongitude();
 
                 destination = new GeoPoint(latitude, longitude);
+                GeoPoint currentLocation = locationOverlay.getMyLocation();
                 // addMarker(destination, "Destination");
                 addMarkerWithCircle(destination, "Destination", destRadius);
 
                 mapView.getController().setCenter(destination);
+                mapView.getController().animateTo(destination);
+
+                BoundingBox box = BoundingBox.fromGeoPoints(
+                        Arrays.asList(currentLocation, destination)
+                );
+
+                mapView.zoomToBoundingBox(box, true, 150);
+
                 Toast.makeText(requireContext(), "Destination set on map!", Toast.LENGTH_SHORT).show();
 
                 if (!isMonitorRunning) {
@@ -888,13 +943,6 @@ public class AlarmFragment extends Fragment {
 
     public void setAlarmText(String placeInput){
         locationInput.setText(placeInput);
-    }
-
-    // Function to stop background service
-    private void stopBackgroundService() {
-        Intent serviceIntent = new Intent(requireContext(), ForegroundService.class);
-        requireActivity().stopService(serviceIntent);
-        Toast.makeText(requireContext(), "Background Service Stopped", Toast.LENGTH_SHORT).show();
     }
 
 }

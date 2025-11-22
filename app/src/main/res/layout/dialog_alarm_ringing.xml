@@ -3,7 +3,7 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     xmlns:app="http://schemas.android.com/apk/res-auto"
-    android:background="@color/white"
+    android:background="@drawable/rounded_card_background"
     >
 
     <!-- Popup Card -->
@@ -35,7 +35,7 @@
             android:layout_gravity="end"
             android:layout_marginTop="-28dp"
             android:layout_marginEnd="5dp"
-            android:contentDescription="Settings" />
+             />
 
         <!-- Alarm Text -->
         <TextView
@@ -70,17 +70,17 @@
             android:layout_marginTop="24dp"
             >
 
-            <Button
-                android:id="@+id/snooze_button"
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_weight="1"
-                app:backgroundTint="@null"
-                android:background="@drawable/button_curved_gray"
-                android:text="Snooze"
-                android:textColor="#000000"
-                android:layout_marginEnd="10dp"
-                android:fontFamily="sans-serif" />
+<!--            <Button-->
+<!--                android:id="@+id/snooze_button"-->
+<!--                android:layout_width="0dp"-->
+<!--                android:layout_height="wrap_content"-->
+<!--                android:layout_weight="1"-->
+<!--                app:backgroundTint="@null"-->
+<!--                android:background="@drawable/button_curved_gray"-->
+<!--                android:text="Snooze"-->
+<!--                android:textColor="#000000"-->
+<!--                android:layout_marginEnd="10dp"-->
+<!--                android:fontFamily="sans-serif" />-->
 
             <Button
                 android:id="@+id/stop_button"

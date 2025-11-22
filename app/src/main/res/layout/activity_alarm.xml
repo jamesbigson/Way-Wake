@@ -72,6 +72,10 @@
                 android:hint="Chennai"
                 android:imeOptions="actionDone"
                 android:inputType="text"
+                android:focusable="false"
+                android:cursorVisible="false"
+                android:focusableInTouchMode="false"
+                android:clickable="true"
                 android:textColor="@android:color/black" />
 
             <ImageView
@@ -196,7 +200,7 @@
                 android:layout_marginBottom="16dp"
                 android:background="@drawable/rounded_textview"
                 android:contentDescription="My Location Button"
-                android:src="@drawable/ic_my_location_off"
+                android:src="@drawable/ic_my_location_on"
                 app:layout_constraintBottom_toBottomOf="parent"
                 app:layout_constraintEnd_toEndOf="parent" />
 
