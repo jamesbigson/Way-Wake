@@ -29,6 +29,15 @@
     <color name="purple">#6300EE</color>
     <color name="light_purple">#F4F1FA</color>
 
+<!--    trying light and dark mode-->
+
+    <color name="light_surface">#F2F2F2</color>
+    <color name="dark_surface">#1E1E1E</color>
+
+    <color name="light_text">#000000</color>  <!-- black text for light mode -->
+    <color name="dark_text">#FFFFFF</color>   <!-- white text for dark mode -->
+
+
 
     <!-- #42000000  #EAE7EE "#E0E0E0" -->
 

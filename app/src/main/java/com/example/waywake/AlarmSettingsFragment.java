@@ -2,6 +2,8 @@ package com.example.waywake;
 
 import static android.content.Context.MODE_PRIVATE;
 
+import static com.example.waywake.AlarmSettings.KEY_DISTANCE_UNIT;
+
 import android.annotation.SuppressLint;
 import android.content.Context;
 import android.content.Intent;
@@ -75,6 +77,8 @@ public class AlarmSettingsFragment extends Fragment {
         sharedPreferences = requireActivity().getSharedPreferences(PREFS_NAME, MODE_PRIVATE);
         editor = sharedPreferences.edit();
 
+        int distance_unit_position = 0; // 0 is for meter
+
         // Load saved preferences
         loadPreferences();
 
@@ -92,6 +96,11 @@ public class AlarmSettingsFragment extends Fragment {
         String[] units = {"Meter", "Kilometer"};
         ArrayAdapter<String> adapter = new ArrayAdapter<>(requireContext(), android.R.layout.simple_spinner_dropdown_item, units);
         unitSpinner.setAdapter(adapter);
+
+        if(sharedPreferences.getString(KEY_DISTANCE_UNIT, "Meter" ).equals("Kilometer")){
+            distance_unit_position = 1 ;
+        }
+        unitSpinner.setSelection(distance_unit_position);
 
         // Set item selection listener
         unitSpinner.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {

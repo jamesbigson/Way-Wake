@@ -76,7 +76,6 @@ import java.util.Set;
 import android.os.Vibrator;
 import android.view.View;
 
-import androidx.core.app.ActivityOptionsCompat;
 import androidx.core.app.NotificationCompat;
 import androidx.fragment.app.Fragment;
 
@@ -672,7 +671,7 @@ public class AlarmFragment extends Fragment {
         }
     }
 
-    @SuppressLint("SetTextI18n")
+    @SuppressLint({"SetTextI18n", "DefaultLocale"})
     private void startAlarmMonitor() {
         isMonitorRunning = true;
         GeoPoint location, destinationLatLng;
@@ -688,7 +687,7 @@ public class AlarmFragment extends Fragment {
             float distance = results[0];
 
             if(distanceUnit.equals("Kilometer")){
-                statusText.setText("Distance to destination: " + (int) distance/1000 + " " + distanceUnit);
+                statusText.setText("Distance to destination: " + String.format("%.1f", distance/1000)  + " " + distanceUnit);
             }else{
                 statusText.setText("Distance to destination: " + (int) distance + " " + distanceUnit);
             }

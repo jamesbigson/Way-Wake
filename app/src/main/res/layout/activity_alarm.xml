@@ -57,10 +57,12 @@
             android:layout_width="match_parent"
             android:layout_height="48dp"
             android:layout_marginVertical="8dp"
-            android:background="@drawable/rounded_edit_text"
+            android:background="@drawable/search_bar_bg"
             android:gravity="center_vertical"
             android:orientation="horizontal"
-            android:padding="8dp">
+            android:elevation="3dp"
+            android:padding="8dp"
+            android:layout_margin="2dp">
 
             <EditText
                 android:id="@+id/location_input"
@@ -76,6 +78,7 @@
                 android:cursorVisible="false"
                 android:focusableInTouchMode="false"
                 android:clickable="true"
+                android:layout_marginStart="6dp"
                 android:textColor="@android:color/black" />
 
             <ImageView

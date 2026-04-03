@@ -71,7 +71,6 @@
             android:layout_marginLeft="5dp"
             app:chipSpacingHorizontal="8dp">
 
-
         </com.google.android.material.chip.ChipGroup>
     </LinearLayout>
 
