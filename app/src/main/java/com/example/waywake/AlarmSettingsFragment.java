@@ -43,7 +43,7 @@ public class AlarmSettingsFragment extends Fragment {
     private Vibrator vibrator;
     private Spinner unitSpinner;
 
-    private String selectedUnit = "Meter"; // Default unit
+    private String selectedUnit = "Kilometer"; // Default unit
 
 
     // Key names for SharedPreferences
@@ -76,7 +76,7 @@ public class AlarmSettingsFragment extends Fragment {
         sharedPreferences = requireActivity().getSharedPreferences(PREFS_NAME, MODE_PRIVATE);
         editor = sharedPreferences.edit();
 
-        int distance_unit_position = 0; // 0 is for meter
+        int distance_unit_position = 1; // 0 is for Kilometer
 
         // Load saved preferences
         loadPreferences();
@@ -96,8 +96,11 @@ public class AlarmSettingsFragment extends Fragment {
         ArrayAdapter<String> adapter = new ArrayAdapter<>(requireContext(), android.R.layout.simple_spinner_dropdown_item, units);
         unitSpinner.setAdapter(adapter);
 
-        if(sharedPreferences.getString(KEY_DISTANCE_UNIT, "Meter" ).equals("Kilometer")){
+        if(sharedPreferences.getString(KEY_DISTANCE_UNIT, "Kilometer" ).equals("Kilometer")){
             distance_unit_position = 1 ;
+        }
+        else{
+            distance_unit_position = 0 ;
         }
         unitSpinner.setSelection(distance_unit_position);
 

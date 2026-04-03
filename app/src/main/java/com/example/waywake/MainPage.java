@@ -22,6 +22,7 @@ import android.widget.TextView;
 
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.app.ActivityCompat;
+import androidx.fragment.app.Fragment;
 import androidx.viewpager2.widget.ViewPager2;
 
 import com.google.android.gms.location.LocationRequest;
@@ -138,17 +139,18 @@ public class MainPage extends AppCompatActivity implements NetworkChangeReceiver
     }
 
     private void showUpdatePopup(String msg, String url) {
-        AlertDialog.Builder dialog = new AlertDialog.Builder(this);
-        dialog.setTitle("Update Required");
-        dialog.setMessage(msg);
+        AlertDialog.Builder builder = new AlertDialog.Builder(this);
+        builder.setTitle("Update Required");
+        builder.setMessage(msg);
+        builder.setCancelable(false);
+        builder.setPositiveButton("Update", null);
 
-        dialog.setCancelable(false);  // cannot close
+        AlertDialog dialog = builder.create();
+        dialog.show();
 
-        dialog.setPositiveButton("Update", (d, which) -> {
+        dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(v -> {
             startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse(url)));
         });
-
-        dialog.show();
     }
 
 
@@ -176,12 +178,25 @@ public class MainPage extends AppCompatActivity implements NetworkChangeReceiver
     }
 
     @Override
+    protected void onNewIntent(Intent intent) {
+        super.onNewIntent(intent);
+        setIntent(intent);
+        if (intent != null && intent.getBooleanExtra("stop_alarm", false)) {
+            stopAlarm();
+        }
+    }
+
+    @Override
     protected void onResume() {
-//        checkForUpdate();
+        super.onResume();
+        checkForUpdate();
         if(isLocationEnabled()){
             createViewPager();
         }
-        super.onResume();
+        if (getIntent() != null && getIntent().getBooleanExtra("stop_alarm", false)) {
+            stopAlarm();
+            getIntent().removeExtra("stop_alarm");
+        }
     }
 
     @Override
@@ -247,11 +262,12 @@ public class MainPage extends AppCompatActivity implements NetworkChangeReceiver
     }
 
     public void stopAlarm() {
-        AlarmFragment alarmFragment = (AlarmFragment) getSupportFragmentManager().findFragmentByTag("f"+2);
-        if(alarmFragment!=null){
-            alarmFragment.stopAlarm();
+        Log.d("MainPage", "Stopping alarm");
+        for (Fragment fragment : getSupportFragmentManager().getFragments()) {
+            if (fragment instanceof AlarmFragment) {
+                ((AlarmFragment) fragment).stopAlarm();
+            }
         }
-
     }
 
     @Override

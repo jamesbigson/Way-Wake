@@ -67,6 +67,14 @@
             android:name=".ForegroundService"
             android:foregroundServiceType="location" />
 
+        <receiver
+            android:name=".AlarmReceiver"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="com.example.waywake.STOP_ALARM" />
+            </intent-filter>
+        </receiver>
+
         <meta-data
             android:name="org.osmdroid.config"
             android:value="true" />

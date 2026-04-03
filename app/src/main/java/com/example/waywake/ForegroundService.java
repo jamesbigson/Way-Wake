@@ -8,7 +8,10 @@ import android.app.PendingIntent;
 import android.app.Service;
 import android.content.Intent;
 
+import android.media.MediaPlayer;
+import android.net.Uri;
 import android.os.IBinder;
+import android.os.Vibrator;
 import android.util.Log;
 
 import androidx.core.app.NotificationCompat;
@@ -16,7 +19,13 @@ import androidx.core.app.NotificationCompat;
 public class ForegroundService extends Service {
 
     public static final String ACTION_UPDATE_NOTIFICATION = "com.example.waywake.UPDATE_NOTIFICATION";
+    public static final String ACTION_START_ALARM = "com.example.waywake.START_ALARM";
+    public static final String ACTION_STOP_ALARM = "com.example.waywake.STOP_ALARM";
     public static final String EXTRA_DISTANCE = "extra_distance";
+
+    private MediaPlayer mediaPlayer;
+    private Vibrator vibrator;
+    private boolean isAlarmRinging = false;
 
     @Override
     public void onCreate() {
@@ -62,26 +71,89 @@ public class ForegroundService extends Service {
 
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
-        if (intent != null && ACTION_UPDATE_NOTIFICATION.equals(intent.getAction())) {
-            String distance = intent.getStringExtra(EXTRA_DISTANCE);
-            if (distance != null) {
-                NotificationManager manager = getSystemService(NotificationManager.class);
-                if (manager != null) {
-                    manager.notify(1, createNotification( distance + " remaining"));
+        if (intent != null) {
+            String action = intent.getAction();
+            if (ACTION_UPDATE_NOTIFICATION.equals(action)) {
+                String distance = intent.getStringExtra(EXTRA_DISTANCE);
+                if (distance != null) {
+                    NotificationManager manager = getSystemService(NotificationManager.class);
+                    if (manager != null) {
+                        manager.notify(1, createNotification(distance + " remaining"));
+                    }
                 }
+            } else if (ACTION_START_ALARM.equals(action)) {
+                startAlarm(intent);
+            } else if (ACTION_STOP_ALARM.equals(action)) {
+                stopAlarm();
             }
         }
         // Service logic here
-        Log.d("ForegroundService", "Service running...");
+        Log.d("ForegroundService", "Service running with action: " + (intent != null ? intent.getAction() : "null"));
         return START_STICKY; // Keeps service alive until explicitly stopped
     }
 
+    private void startAlarm(Intent intent) {
+        if (isAlarmRinging) return;
+        isAlarmRinging = true;
+
+        Log.d("ForegroundService", "Starting alarm sound and vibration");
+
+        // Vibration
+        if (intent.getBooleanExtra("vibration_enabled", true)) {
+            vibrator = (Vibrator) getSystemService(VIBRATOR_SERVICE);
+            if (vibrator != null) {
+                long[] pattern = {0, 500, 500, 500};
+                vibrator.vibrate(pattern, 0);
+            }
+        }
+
+        // Sound 
+        try {
+            // Check for sound name/URI in intent if needed
+            String sound = intent.getStringExtra("alarm_sound");
+            if (sound == null || sound.equals("chiptune")) {
+                 int soundResId = getResources().getIdentifier("chiptune", "raw", getPackageName());
+                 mediaPlayer = MediaPlayer.create(this, soundResId);
+            } else if (sound.startsWith("content://")) {
+                mediaPlayer = MediaPlayer.create(this, Uri.parse(sound));
+            } else if (!sound.equals("Silent")) {
+                int soundResId = getResources().getIdentifier(sound, "raw", getPackageName());
+                mediaPlayer = MediaPlayer.create(this, soundResId);
+            }
+
+            if (mediaPlayer != null) {
+                mediaPlayer.setLooping(true);
+                mediaPlayer.start();
+            }
+        } catch (Exception e) {
+            Log.e("ForegroundService", "Error starting sound", e);
+        }
+    }
+
+    private void stopAlarm() {
+        Log.d("ForegroundService", "Stopping alarm sound and vibration");
+        isAlarmRinging = false;
+        if (vibrator != null) {
+            vibrator.cancel();
+        }
+        if (mediaPlayer != null) {
+            try {
+                if (mediaPlayer.isPlaying()) {
+                    mediaPlayer.stop();
+                }
+                mediaPlayer.release();
+            } catch (Exception e) {
+                Log.e("ForegroundService", "Error stopping sound", e);
+            } finally {
+                mediaPlayer = null;
+            }
+        }
+    }
+
     @Override
-    public void onTaskRemoved(Intent rootIntent) {
-        // Called when app is swiped from recent apps
-        Log.d("ForegroundService", "App removed from recent apps. Stopping service...");
-        stopSelf(); // Stop the service
-        super.onTaskRemoved(rootIntent);
+    public void onDestroy() {
+        stopAlarm();
+        super.onDestroy();
     }
 
     @Override

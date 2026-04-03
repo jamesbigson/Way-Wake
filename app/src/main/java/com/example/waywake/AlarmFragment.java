@@ -19,6 +19,7 @@ import android.app.NotificationManager;
 import android.app.PendingIntent;
 import android.content.Context;
 import android.content.Intent;
+import android.content.IntentFilter;
 import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
 
@@ -77,6 +78,7 @@ import android.os.Vibrator;
 import android.view.View;
 
 import androidx.core.app.NotificationCompat;
+import androidx.core.content.ContextCompat;
 import androidx.fragment.app.Fragment;
 
 import android.provider.Settings;
@@ -112,6 +114,7 @@ public class AlarmFragment extends Fragment {
     private static final String CHANNEL_ID = "location_alarm_channel";
     private boolean isShowingLocation = false;
     private boolean isAlarmRinging = false;
+    private AlertDialog alarmDialog;
     private boolean showMyLocation = true;
     private CompassOverlay compassOverlay;
     ActivityResultLauncher<Intent> searchLauncher;
@@ -119,6 +122,33 @@ public class AlarmFragment extends Fragment {
     public static final int LOCATION_PERMISSION_REQUEST_CODE = 1001;
     public static final String USER_SETTINGS_PREFS_NAME = "user_settings";
 
+
+    @Override
+    public void onCreate(@Nullable Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
+        registerStopAlarmReceiver();
+    }
+
+    private void registerStopAlarmReceiver() {
+        IntentFilter filter = new IntentFilter("STOP_ALARM_EVENT");
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            requireContext().registerReceiver(stopAlarmReceiver, filter, Context.RECEIVER_EXPORTED);
+        } else {
+            requireContext().registerReceiver(stopAlarmReceiver, filter);
+        }
+    }
+
+    private final android.content.BroadcastReceiver stopAlarmReceiver = new android.content.BroadcastReceiver() {
+        @Override
+        public void onReceive(Context context, Intent intent) {
+            Log.d("AlarmFragment", "Broadcast received: STOP_ALARM_EVENT in instance " + AlarmFragment.this.hashCode());
+            stopAlarm();
+            NotificationManager notificationManager = (NotificationManager) context.getSystemService(Context.NOTIFICATION_SERVICE);
+            if (notificationManager != null) {
+                notificationManager.cancel(2);
+            }
+        }
+    };
 
     @SuppressLint({"ClickableViewAccessibility", "SetTextI18n"})
     @Nullable
@@ -134,8 +164,6 @@ public class AlarmFragment extends Fragment {
         setAlarmButton = view.findViewById(R.id.set_alarm_button);
         radiusLabel = view.findViewById(R.id.radius_label);
         vibrator = (Vibrator) requireContext().getSystemService(VIBRATOR_SERVICE);
-//        testBtn = view.findViewById(R.id.tv_set_alarm_title);
-//        autoCompleteTextView = view.findViewById(R.id.autoCompleteTextView);
 
         SeekBar radiusSeekBar = view.findViewById(R.id.radius_seekbar);
         ImageButton myLocationButton = view.findViewById(R.id.my_location_button);
@@ -491,77 +519,69 @@ public class AlarmFragment extends Fragment {
     public void onPause() {
         super.onPause();
         if (mapView != null) {
-            if (compassOverlay != null) compassOverlay.disableCompass();
+            if (compassOverlay != null) compassOverlay.enableCompass();
         }
+    }
+
+    @Override
+    public void onStop() {
+        super.onStop();
+    }
+
+    @Override
+    public void onStart() {
+        super.onStart();
     }
 
     @SuppressLint("MissingSuperCall")
     @Override
     public void onDestroy() {
         super.onDestroy();
+        Log.d("AlarmFragment", "onDestroy() called for instance " + this.hashCode());
+        stopAlarm();
+        isMonitorRunning = false;
+        try {
+            requireContext().unregisterReceiver(stopAlarmReceiver);
+        } catch (Exception e) {
+            Log.e("AlarmFragment", "Error unregistering receiver", e);
+        }
         if (mapView != null) {
             mapView.onDetach();
         }
-
     }
 
     private void triggerAlarm() {
-        // Trigger the alarm actions
+        // Trigger the alarm actions in ForegroundService
+        Intent intent = new Intent(requireContext(), ForegroundService.class);
+        intent.setAction(ForegroundService.ACTION_START_ALARM);
+        
+        // Pass user settings to service
+        String alarmSound = userSettingsSP.getString(KEY_ALARM_SOUND, "chiptune");
+        intent.putExtra("alarm_sound", alarmSound);
+        boolean vibrationEnabled = userSettingsSP.getBoolean(KEY_VIBRATION, true);
+        intent.putExtra("vibration_enabled", vibrationEnabled);
+
+        requireContext().startService(intent);
+
         if(!isAlarmRinging){
             isAlarmRinging = true;
-            startVibration();
-            startSound();
             showPopup();
-
-        }
-    }
-
-    private void startVibration() {
-        if (vibrator != null) {
-            long[] pattern = {0, 500, 500, 500}; // Wait, Vibrate, Pause, Vibrate
-
-            if(userSettingsSP.getBoolean(KEY_VIBRATION, true)){
-                vibrator = (Vibrator) requireContext().getSystemService(VIBRATOR_SERVICE);
-                vibrator.vibrate(pattern, 0); // Repeat until stopped
-            }
-        }
-    }
-
-    private void stopVibration() {
-        if (vibrator != null) {
-            vibrator.cancel();
-        }
-    }
-
-    private void startSound(){
-        String alarmSound = userSettingsSP.getString(KEY_ALARM_SOUND, "chiptune");
-
-        if(!alarmSound.equals("Silent")){
-
-            if (alarmSound.startsWith("content://")) {
-                mediaPlayer = MediaPlayer.create(requireContext(), Uri.parse(alarmSound));
-            } else {
-                @SuppressLint("DiscouragedApi")
-                int soundResId = requireContext().getResources().getIdentifier(alarmSound, "raw", requireContext().getPackageName());
-                mediaPlayer = MediaPlayer.create(requireContext(), soundResId);
-            }
-            mediaPlayer.setLooping(true);
-            mediaPlayer.start();
-        }
-    }
-
-    private void stopSound(){
-        if (mediaPlayer != null) {
-            mediaPlayer.stop();
-            mediaPlayer.release();
         }
     }
 
     void stopAlarm(){
-        if(isAlarmRinging){
-            stopSound();
-            stopVibration();
-            isAlarmRinging=false;
+        Log.d("AlarmFragment", "stopAlarm() called for instance " + this.hashCode() + ", isAlarmRinging: " + isAlarmRinging);
+        
+        // Stop the alarm actions in ForegroundService
+        Intent intent = new Intent(requireContext(), ForegroundService.class);
+        intent.setAction(ForegroundService.ACTION_STOP_ALARM);
+        requireContext().startService(intent);
+
+        isAlarmRinging = false;
+
+        if (alarmDialog != null && alarmDialog.isShowing()) {
+            alarmDialog.dismiss();
+            alarmDialog = null;
         }
     }
 
@@ -572,21 +592,22 @@ public class AlarmFragment extends Fragment {
         View dialogView = LayoutInflater.from(requireContext()).inflate(R.layout.dialog_alarm_ringing, null);
         builder.setView(dialogView);
 
-        AlertDialog dialog = builder.create();
-        dialog.getWindow().setBackgroundDrawableResource(android.R.color.transparent);
+        if (alarmDialog != null && alarmDialog.isShowing()) {
+            alarmDialog.dismiss();
+        }
+        alarmDialog = builder.create();
+        alarmDialog.getWindow().setBackgroundDrawableResource(android.R.color.transparent);
 
 
         dialogView.findViewById(R.id.stop_button).setOnClickListener(v -> {
             stopAlarm();
-            dialog.dismiss();
         });
 
         dialogView.findViewById(R.id.iv_close).setOnClickListener(v -> {
             stopAlarm();
-            dialog.dismiss();
         });
 
-        dialog.show();
+        alarmDialog.show();
 
     }
 
@@ -618,6 +639,11 @@ public class AlarmFragment extends Fragment {
 
     @SuppressLint({"SetTextI18n", "DefaultLocale"})
     private void startAlarmMonitor() {
+        if (!isAdded() || destination == null) {
+            isMonitorRunning = false;
+            return;
+        }
+
         isMonitorRunning = true;
         GeoPoint location, destinationLatLng;
 
@@ -779,29 +805,33 @@ public class AlarmFragment extends Fragment {
     }
 
     private void showNotification(String title, String message) {
-
         Intent intent = new Intent(requireContext(), MainPage.class);
         intent.setFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP | Intent.FLAG_ACTIVITY_CLEAR_TOP);
+        PendingIntent pendingIntent = PendingIntent.getActivity(requireContext(), 0, intent, 
+                PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
 
-        PendingIntent pendingIntent = PendingIntent.getActivity(
-                requireContext(),
-                0,
-                intent,
-                PendingIntent.FLAG_MUTABLE
-        );
-
-        NotificationManager notificationManager = (NotificationManager) requireContext().getSystemService(NOTIFICATION_SERVICE);
+        Intent stopIntent = new Intent(requireContext(), AlarmReceiver.class);
+        stopIntent.setAction(AlarmReceiver.ACTION_STOP_ALARM);
+        PendingIntent stopPendingIntent = PendingIntent.getBroadcast(requireContext(), 1, stopIntent, 
+                PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
 
         NotificationCompat.Builder builder = new NotificationCompat.Builder(requireContext(), CHANNEL_ID)
                 .setSmallIcon(R.drawable.ic_location)
                 .setContentTitle(title)
                 .setContentText(message)
-                .setPriority(NotificationCompat.PRIORITY_HIGH)
+                .setPriority(NotificationCompat.PRIORITY_MAX)
+                .setCategory(NotificationCompat.CATEGORY_ALARM)
+                .setDefaults(NotificationCompat.DEFAULT_ALL)
+                .setFullScreenIntent(pendingIntent, true)
                 .setContentIntent(pendingIntent)
-                .setAutoCancel(true); // Notification disappears when clicked
+                .setAutoCancel(true)
+                .setOngoing(true)
+                .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
+                .addAction(android.R.drawable.ic_delete, "Stop Alarm", stopPendingIntent);
 
+        NotificationManager notificationManager = (NotificationManager) requireContext().getSystemService(NOTIFICATION_SERVICE);
         if (notificationManager != null) {
-            notificationManager.notify(1, builder.build()); // ID '1' is unique for this notification
+            notificationManager.notify(2, builder.build());
         }
     }
 
