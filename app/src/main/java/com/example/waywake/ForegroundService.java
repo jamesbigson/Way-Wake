@@ -15,26 +15,19 @@ import androidx.core.app.NotificationCompat;
 
 public class ForegroundService extends Service {
 
+    public static final String ACTION_UPDATE_NOTIFICATION = "com.example.waywake.UPDATE_NOTIFICATION";
+    public static final String EXTRA_DISTANCE = "extra_distance";
+
     @Override
     public void onCreate() {
         super.onCreate();
 
-        startForeground(1, createNotification());
+        createNotificationChannel();
+        startForeground(1, createNotification("Foreground Service is active."));
         Log.d("ForegroundService", "Service created...");
     }
 
-    private Notification createNotification() {
-        Intent intent = new Intent(this, MainPage.class);
-        intent.setFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP | Intent.FLAG_ACTIVITY_CLEAR_TOP);
-
-        PendingIntent pendingIntent = PendingIntent.getActivity(
-                this,
-                0,
-                intent,
-                PendingIntent.FLAG_MUTABLE
-        );
-
-
+    private void createNotificationChannel() {
         NotificationChannel channel = new NotificationChannel(
                 "foreground_service_channel",
                 "Foreground Service",
@@ -42,11 +35,25 @@ public class ForegroundService extends Service {
         );
 
         NotificationManager manager = getSystemService(NotificationManager.class);
-        manager.createNotificationChannel(channel);
+        if (manager != null) {
+            manager.createNotificationChannel(channel);
+        }
+    }
+
+    private Notification createNotification(String contentText) {
+        Intent intent = new Intent(this, MainPage.class);
+        intent.setFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP | Intent.FLAG_ACTIVITY_CLEAR_TOP);
+
+        PendingIntent pendingIntent = PendingIntent.getActivity(
+                this,
+                0,
+                intent,
+                PendingIntent.FLAG_IMMUTABLE // Changed from FLAG_MUTABLE for better practice if not needed
+        );
 
         return new NotificationCompat.Builder(this, "foreground_service_channel")
-                .setContentTitle("Running in Background")
-                .setContentText("Foreground Service is active.")
+                .setContentTitle("Way Wake Active")
+                .setContentText(contentText)
                 .setSmallIcon(R.drawable.ic_location)
                 .setContentIntent(pendingIntent)
                 .setOngoing(true)
@@ -55,6 +62,15 @@ public class ForegroundService extends Service {
 
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
+        if (intent != null && ACTION_UPDATE_NOTIFICATION.equals(intent.getAction())) {
+            String distance = intent.getStringExtra(EXTRA_DISTANCE);
+            if (distance != null) {
+                NotificationManager manager = getSystemService(NotificationManager.class);
+                if (manager != null) {
+                    manager.notify(1, createNotification( distance + " remaining"));
+                }
+            }
+        }
         // Service logic here
         Log.d("ForegroundService", "Service running...");
         return START_STICKY; // Keeps service alive until explicitly stopped

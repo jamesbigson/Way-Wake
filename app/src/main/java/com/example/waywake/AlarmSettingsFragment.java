@@ -2,7 +2,6 @@ package com.example.waywake;
 
 import static android.content.Context.MODE_PRIVATE;
 
-import static com.example.waywake.AlarmSettings.KEY_DISTANCE_UNIT;
 
 import android.annotation.SuppressLint;
 import android.content.Context;

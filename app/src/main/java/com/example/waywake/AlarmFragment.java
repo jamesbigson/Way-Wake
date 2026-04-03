@@ -463,57 +463,6 @@ public class AlarmFragment extends Fragment {
         mapView.invalidate();
     }
 
-/*
-    @SuppressLint("StaticFieldLeak")
-    private void fetchSuggestions(String query) {
-        String apiUrl = "https://nominatim.openstreetmap.org/search?format=json&q=" + query + "&countrycodes=in";
-
-        new AsyncTask<Void, Void, List<String>>() {
-            @Override
-            protected List<String> doInBackground(Void... voids) {
-                List<String> suggestions = new ArrayList<>();
-                try {
-                    URL url = new URL(apiUrl);
-                    HttpURLConnection conn = (HttpURLConnection) url.openConnection();
-                    conn.setRequestMethod("GET");
-                    conn.setRequestProperty("User-Agent", "Mozilla/5.0");
-
-                    BufferedReader reader = new BufferedReader(new InputStreamReader(conn.getInputStream()));
-                    StringBuilder response = new StringBuilder();
-                    String line;
-                    while ((line = reader.readLine()) != null) {
-                        response.append(line);
-                    }
-                    reader.close();
-
-                    // Parse the JSON response
-                    JSONArray jsonArray = new JSONArray(response.toString());
-                    for (int i = 0; i < jsonArray.length(); i++) {
-                        JSONObject obj = jsonArray.getJSONObject(i);
-                        String displayName = obj.getString("display_name");
-                        suggestions.add(displayName);
-                    }
-                } catch (Exception e) {
-                    Log.e("NominatimError", "Error fetching suggestions", e);
-                }
-                return suggestions;
-            }
-
-            @Override
-            protected void onPostExecute(List<String> result) {
-                if (!result.isEmpty()) {
-                    ArrayAdapter<String> adapter = new ArrayAdapter<>(requireContext(),
-                            android.R.layout.simple_dropdown_item_1line, result);
-                    autoCompleteTextView.setAdapter(adapter);
-                    autoCompleteTextView.showDropDown();
-                } else {
-                    Toast.makeText(requireContext(), "No suggestions found!", Toast.LENGTH_SHORT).show();
-                }
-            }
-        }.execute();
-    }*/
-
-
     @SuppressLint("SetTextI18n")
     @Override
     public void onResume() {
@@ -627,10 +576,6 @@ public class AlarmFragment extends Fragment {
         dialog.getWindow().setBackgroundDrawableResource(android.R.color.transparent);
 
 
-//        dialogView.findViewById(R.id.snooze_button).setOnClickListener(v -> {
-//            stopAlarm();
-//            dialog.dismiss();
-//        });
         dialogView.findViewById(R.id.stop_button).setOnClickListener(v -> {
             stopAlarm();
             dialog.dismiss();
@@ -686,11 +631,16 @@ public class AlarmFragment extends Fragment {
 
             float distance = results[0];
 
+            String distanceStr;
             if(distanceUnit.equals("Kilometer")){
-                statusText.setText("Distance to destination: " + String.format("%.1f", distance/1000)  + " " + distanceUnit);
+                distanceStr = String.format("%.1f", distance/1000)  + " " + "km";
             }else{
-                statusText.setText("Distance to destination: " + (int) distance + " " + distanceUnit);
+                distanceStr = (int) distance + " " + "m";
             }
+            statusText.setText("Distance to destination: " + distanceStr);
+
+            // Update Foreground Service Notification
+            updateForegroundServiceNotification(distanceStr);
 
 
             if(showMyLocation){
@@ -802,6 +752,15 @@ public class AlarmFragment extends Fragment {
     private void startLocationService(){
         Intent serviceIntent = new Intent(requireContext(), ForegroundService.class);
         requireContext().startForegroundService(serviceIntent); // For Android 8.0+ (Oreo)
+    }
+
+    private void updateForegroundServiceNotification(String distance) {
+        if (isAdded()) {
+            Intent serviceIntent = new Intent(requireContext(), ForegroundService.class);
+            serviceIntent.setAction(ForegroundService.ACTION_UPDATE_NOTIFICATION);
+            serviceIntent.putExtra(ForegroundService.EXTRA_DISTANCE, distance);
+            requireContext().startService(serviceIntent);
+        }
     }
 
 
