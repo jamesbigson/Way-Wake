@@ -26,8 +26,12 @@ import java.net.URL;
 import java.net.URLEncoder;
 
 import java.util.ArrayList;
-
+import java.util.Collections;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
+import android.content.SharedPreferences;
+import android.content.Context;
 
 
 public class Search_page extends AppCompatActivity {
@@ -60,15 +64,20 @@ public class Search_page extends AppCompatActivity {
         }
 
         adapter = new SuggestionAdapter(list, item -> {
-
-            String place = String.format("%s %s", item.title, item.subtitle);
+            String place;
+            if ("History".equals(item.subtitle)) {
+                place = item.title;
+            } else {
+                place = (item.subtitle == null || item.subtitle.isEmpty()) 
+                        ? item.title 
+                        : String.format("%s %s", item.title, item.subtitle);
+            }
             searchBox.setText(place);
 
             Intent resultIntent = new Intent();
             resultIntent.putExtra("selected_place", place);
             setResult(RESULT_OK, resultIntent);
             finish();   // go back to AlarmFragment
-
         });
 
         suggestionList.setLayoutManager(new LinearLayoutManager(this));
@@ -102,6 +111,7 @@ public class Search_page extends AppCompatActivity {
             @Override public void onTextChanged(CharSequence s, int start, int before, int count) {
                 if(searchBox.getText().toString().isEmpty()){
                     clearTextButton.setVisibility(View.GONE);
+                    loadHistorySuggestions();
                 }else{
                     clearTextButton.setVisibility(View.VISIBLE);
                 }
@@ -110,8 +120,42 @@ public class Search_page extends AppCompatActivity {
             @Override
             public void afterTextChanged(Editable s) {
                 if (s.length() > 2) fetchLocationIQ(s.toString());
+                else if (s.length() == 0) loadHistorySuggestions();
             }
         });
+
+        loadHistorySuggestions();
+    }
+
+    private void loadHistorySuggestions() {
+        SharedPreferences sharedPreferences = getSharedPreferences("history_pref", Context.MODE_PRIVATE);
+        Set<String> historySet = sharedPreferences.getStringSet("historyList", new HashSet<>());
+        
+        list.clear();
+        if (historySet != null) {
+            List<String> sortedHistory = new ArrayList<>(historySet);
+            // Sort by timestamp descending
+            Collections.sort(sortedHistory, (a, b) -> {
+                try {
+                    String[] partsA = a.split(";", 2);
+                    String[] partsB = b.split(";", 2);
+                    if (partsA.length < 2 || partsB.length < 2) return 0;
+                    long t1 = Long.parseLong(partsA[1]);
+                    long t2 = Long.parseLong(partsB[1]);
+                    return Long.compare(t2, t1); // Descending order
+                } catch (Exception e) {
+                    return 0;
+                }
+            });
+
+            for (String item : sortedHistory) {
+                String[] parts = item.split(";", 2);
+                if (parts.length >= 1) {
+                    list.add(new PlaceItem(parts[0], "History"));
+                }
+            }
+        }
+        runOnUiThread(adapter::notifyDataSetChanged);
     }
 
     private void fetchLocationIQ(String query) {
