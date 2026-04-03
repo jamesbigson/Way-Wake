@@ -815,7 +815,7 @@ public class AlarmFragment extends Fragment {
         PendingIntent stopPendingIntent = PendingIntent.getBroadcast(requireContext(), 1, stopIntent, 
                 PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
 
-        NotificationCompat.Builder builder = new NotificationCompat.Builder(requireContext(), CHANNEL_ID)
+        @SuppressLint("NotificationTrampoline") NotificationCompat.Builder builder = new NotificationCompat.Builder(requireContext(), CHANNEL_ID)
                 .setSmallIcon(R.drawable.ic_location)
                 .setContentTitle(title)
                 .setContentText(message)
