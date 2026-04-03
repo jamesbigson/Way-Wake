@@ -53,6 +53,12 @@ public class Search_page extends AppCompatActivity {
         suggestionList = findViewById(R.id.suggestionList);
         clearTextButton = findViewById(R.id.clear_text);
 
+        Intent intent = getIntent();
+        String location = intent.getStringExtra("LOCATION_INPUT");
+        if (location != null) {
+            searchBox.setText(location);
+        }
+
         adapter = new SuggestionAdapter(list, item -> {
 
             String place = String.format("%s %s", item.title, item.subtitle);

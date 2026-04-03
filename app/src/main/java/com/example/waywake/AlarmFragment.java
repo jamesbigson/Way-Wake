@@ -327,6 +327,7 @@ public class AlarmFragment extends Fragment {
         // Open SearchActivity when clicked
         locationInput.setOnClickListener(v -> {
             Intent intent = new Intent(getActivity(), Search_page.class);
+            intent.putExtra("LOCATION_INPUT", locationInput.getText().toString());
             searchLauncher.launch(intent);
         });
 
