@@ -157,6 +157,13 @@ public class ForegroundService extends Service {
     }
 
     @Override
+    public void onTaskRemoved(Intent rootIntent) {
+        Log.d("ForegroundService", "App swiped out from recents. Stopping service...");
+        stopSelf();
+        super.onTaskRemoved(rootIntent);
+    }
+
+    @Override
     public IBinder onBind(Intent intent) {
         return null;
     }

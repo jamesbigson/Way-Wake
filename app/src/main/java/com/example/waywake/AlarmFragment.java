@@ -617,6 +617,20 @@ public class AlarmFragment extends Fragment {
         locationOverlay = new MyLocationNewOverlay(mapView);
         locationOverlay.enableMyLocation();
         locationOverlay.enableFollowLocation();
+
+        // Customize the location icons
+        android.graphics.drawable.Drawable personDrawable = ContextCompat.getDrawable(requireContext(), R.drawable.ic_user_direction);
+        if (personDrawable != null) {
+            android.graphics.Bitmap personBitmap = android.graphics.Bitmap.createBitmap(personDrawable.getIntrinsicWidth(),
+                    personDrawable.getIntrinsicHeight(), android.graphics.Bitmap.Config.ARGB_8888);
+            android.graphics.Canvas canvas = new android.graphics.Canvas(personBitmap);
+            personDrawable.setBounds(0, 0, canvas.getWidth(), canvas.getHeight());
+            personDrawable.draw(canvas);
+            
+            locationOverlay.setPersonIcon(personBitmap);
+            locationOverlay.setDirectionArrow(personBitmap, personBitmap);
+        }
+
         locationOverlay.runOnFirstFix(this::run);
         mapView.getOverlays().add(locationOverlay);
 
