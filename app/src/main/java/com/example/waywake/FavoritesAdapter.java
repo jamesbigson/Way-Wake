@@ -19,12 +19,14 @@ public class FavoritesAdapter extends RecyclerView.Adapter<FavoritesAdapter.Favo
     private OnSetAlarmListener alarmListener;
 
     private OnDestinationAlarmListener destinationAlarmListener;
+    private OnFavoriteLongClickListener longClickListener;
 
-    public FavoritesAdapter(List<FavoriteItem> favoriteList, OnFavoriteRemoveListener removeListener, OnSetAlarmListener alarmListener,OnDestinationAlarmListener destinationAlarmListener ) {
+    public FavoritesAdapter(List<FavoriteItem> favoriteList, OnFavoriteRemoveListener removeListener, OnSetAlarmListener alarmListener, OnDestinationAlarmListener destinationAlarmListener, OnFavoriteLongClickListener longClickListener) {
         this.favoriteList = favoriteList;
         this.removeListener = removeListener;
         this.alarmListener = alarmListener;
         this.destinationAlarmListener = destinationAlarmListener;
+        this.longClickListener = longClickListener;
     }
 
     @NonNull
@@ -58,6 +60,11 @@ public class FavoritesAdapter extends RecyclerView.Adapter<FavoritesAdapter.Favo
                 alarmListener.onsetAlarm(locationAddress);
             }
         });
+
+        holder.itemView.setOnLongClickListener(v -> {
+            longClickListener.onLongClick(location);
+            return true;
+        });
     }
 
     @Override
@@ -88,5 +95,9 @@ public class FavoritesAdapter extends RecyclerView.Adapter<FavoritesAdapter.Favo
 
     public interface OnDestinationAlarmListener {
         void onSetDestination(double latitude, double longitude);
+    }
+
+    public interface OnFavoriteLongClickListener {
+        void onLongClick(FavoriteItem item);
     }
 }

@@ -1,6 +1,7 @@
 package com.example.waywake;
 
 import android.annotation.SuppressLint;
+import android.app.AlertDialog;
 import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
@@ -20,6 +21,9 @@ import androidx.recyclerview.widget.RecyclerView;
 import com.google.android.material.bottomnavigation.BottomNavigationView;
 import com.google.android.material.floatingactionbutton.FloatingActionButton;
 
+import androidx.core.content.pm.ShortcutInfoCompat;
+import androidx.core.content.pm.ShortcutManagerCompat;
+import androidx.core.graphics.drawable.IconCompat;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
@@ -44,11 +48,14 @@ public class FavouritesFragment extends Fragment {
         rvFavorites.setLayoutManager(new LinearLayoutManager(getContext()));
 
         FloatingActionButton btnAddFavorite = view.findViewById(R.id.btnAddFavorite);
+        android.widget.ImageButton btnDeleteAll = view.findViewById(R.id.delete_all);
         sharedPreferences = requireActivity().getSharedPreferences(PREF_NAME, Context.MODE_PRIVATE);
 
         favoriteList = new ArrayList<>();
-        adapter = new FavoritesAdapter(favoriteList, this::removeFavorite,this::setAlarm, this::setDestination);
+        adapter = new FavoritesAdapter(favoriteList, this::removeFavorite,this::setAlarm, this::setDestination, this::showShortcutDialog);
         rvFavorites.setAdapter(adapter);
+        
+        
 
         // Load favorites from SharedPreferences
         loadFavorites();
@@ -58,6 +65,14 @@ public class FavouritesFragment extends Fragment {
         btnAddFavorite.setOnClickListener(v -> {
             Intent intent = new Intent(requireContext(), AddFavoriteActivity.class);
             startActivity(intent);
+        });
+
+        btnDeleteAll.setOnClickListener(v -> {
+            if (favoriteList.isEmpty()) {
+                Toast.makeText(getContext(), "No favorites to delete", Toast.LENGTH_SHORT).show();
+            } else {
+                showClearFavoritesConfirmation();
+            }
         });
 
         return view;
@@ -80,7 +95,7 @@ public class FavouritesFragment extends Fragment {
             Log.d("FavoriteFragment", "No Favorites to display");
         }
 
-        adapter = new FavoritesAdapter(favoriteList, this::removeFavorite,this::setAlarm,this::setDestination);
+        adapter = new FavoritesAdapter(favoriteList, this::removeFavorite,this::setAlarm,this::setDestination, this::showShortcutDialog);
         rvFavorites.setAdapter(adapter);
     }
 
@@ -120,6 +135,54 @@ public class FavouritesFragment extends Fragment {
         }
 
         sharedPreferences.edit().putStringSet(FAVORITES_KEY, favoritesSet).apply();
+    }
+
+    private void clearFavorites() {
+        SharedPreferences.Editor editor = sharedPreferences.edit();
+        editor.clear();
+        editor.apply();
+        favoriteList.clear();
+        adapter.notifyDataSetChanged();
+        Toast.makeText(getContext(), "All favorites cleared", Toast.LENGTH_SHORT).show();
+    }
+
+    private void showClearFavoritesConfirmation() {
+        new AlertDialog.Builder(requireContext())
+                .setTitle("Clear Favorites")
+                .setMessage("Are you sure you want to clear all favorites?")
+                .setPositiveButton("Yes", (dialog, which) -> clearFavorites())
+                .setNegativeButton("No", null)
+                .show();
+    }
+
+    private void showShortcutDialog(FavoriteItem item) {
+        new AlertDialog.Builder(requireContext())
+                .setTitle("Create Shortcut")
+                .setMessage("Do you want to add a home screen shortcut for \"" + item.getLocationName() + "\"?")
+                .setPositiveButton("Create", (dialog, which) -> createShortcut(item))
+                .setNegativeButton("Cancel", null)
+                .show();
+    }
+
+    private void createShortcut(FavoriteItem item) {
+        Intent shortcutIntent = new Intent(requireContext(), MainPage.class);
+        shortcutIntent.setAction(Intent.ACTION_MAIN);
+        shortcutIntent.putExtra("shortcut_location", item.getLocationName());
+        shortcutIntent.putExtra("shortcut_address", item.getLocationAddress());
+        shortcutIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP);
+
+        ShortcutInfoCompat shortcut = new ShortcutInfoCompat.Builder(requireContext(), item.getLocationName())
+                .setShortLabel(item.getLocationName())
+                .setLongLabel( item.getLocationName()) // "Wake me up at " +
+                .setIcon(IconCompat.createWithResource(requireContext(), R.drawable.ic_location))
+                .setIntent(shortcutIntent)
+                .build();
+
+        if (ShortcutManagerCompat.requestPinShortcut(requireContext(), shortcut, null)) {
+            Toast.makeText(requireContext(), "Shortcut creation requested", Toast.LENGTH_SHORT).show();
+        } else {
+            Toast.makeText(requireContext(), "Shortcut creation failed", Toast.LENGTH_SHORT).show();
+        }
     }
 
     @SuppressLint("NotifyDataSetChanged")

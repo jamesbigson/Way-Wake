@@ -186,8 +186,11 @@ public class MainPage extends AppCompatActivity implements NetworkChangeReceiver
     protected void onNewIntent(Intent intent) {
         super.onNewIntent(intent);
         setIntent(intent);
-        if (intent != null && intent.getBooleanExtra("stop_alarm", false)) {
-            stopAlarm();
+        if (intent != null) {
+            if (intent.getBooleanExtra("stop_alarm", false)) {
+                stopAlarm();
+            }
+            handleShortcutIntent(intent);
         }
     }
 
@@ -198,9 +201,47 @@ public class MainPage extends AppCompatActivity implements NetworkChangeReceiver
         if(isLocationEnabled()){
             createViewPager();
         }
-        if (getIntent() != null && getIntent().getBooleanExtra("stop_alarm", false)) {
-            stopAlarm();
-            getIntent().removeExtra("stop_alarm");
+        Intent intent = getIntent();
+        if (intent != null) {
+            if (intent.getBooleanExtra("stop_alarm", false)) {
+                stopAlarm();
+                intent.removeExtra("stop_alarm");
+            }
+            handleShortcutIntent(intent);
+        }
+    }
+
+    private void handleShortcutIntent(Intent intent) {
+        String location = intent.getStringExtra("shortcut_location");
+        String address = intent.getStringExtra("shortcut_address");
+
+        if (location != null && address != null) {
+            // Give ViewPager a moment to initialize if needed
+            viewPager.postDelayed(() -> {
+                bottomNavigationView.setSelectedItemId(R.id.nav_set_alarm);
+                viewPager.setCurrentItem(2, false);
+
+                // Find AlarmFragment and set the location
+                for (Fragment fragment : getSupportFragmentManager().getFragments()) {
+                    if (fragment instanceof AlarmFragment) {
+                        if (Character.isDigit(address.charAt(0))) {
+                            try {
+                                String[] parts = address.split(";", 2);
+                                ((AlarmFragment) fragment).setDestination(Double.parseDouble(parts[0]), Double.parseDouble(parts[1]));
+                            } catch (Exception e) {
+                                ((AlarmFragment) fragment).setAlarm(address);
+                            }
+                        } else {
+                            ((AlarmFragment) fragment).setAlarm(address);
+                        }
+                        break;
+                    }
+                }
+            }, 500);
+            
+            // Clear extras so it doesn't trigger again on rotation
+            intent.removeExtra("shortcut_location");
+            intent.removeExtra("shortcut_address");
         }
     }
 
