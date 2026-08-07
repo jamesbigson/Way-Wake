@@ -42,9 +42,12 @@
             android:layout_width="wrap_content"
             android:layout_height="match_parent"
             android:src="@drawable/ic_close"
-            android:padding="4dp"
-            android:visibility="gone"
-            app:tint="@color/black"/>
+            android:padding="2dp"
+            app:tint="@color/gray"
+            android:clickable="true"
+            android:focusable="true"
+            android:visibility="visible"/>
+
     </LinearLayout>
 
 

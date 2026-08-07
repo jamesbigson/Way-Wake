@@ -44,7 +44,7 @@ public class SelectMapLocation extends AppCompatActivity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        Configuration.getInstance().setUserAgentValue(getPackageName());
+        Configuration.getInstance().setUserAgentValue("WayWake/1.0 (jamesbigson/Way-Wake)");
         setContentView(R.layout.activity_select_map_location);
 
         mapView = findViewById(R.id.osm_map);

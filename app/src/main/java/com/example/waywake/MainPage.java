@@ -53,7 +53,7 @@ public class MainPage extends AppCompatActivity implements NetworkChangeReceiver
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        Configuration.getInstance().setUserAgentValue("MyLocationApp/1.0");
+        Configuration.getInstance().setUserAgentValue("WayWake/1.0 (jamesbigson/Way-Wake)");
         setContentView(R.layout.activity_main_page);
 
         FirebaseApp.initializeApp(this);

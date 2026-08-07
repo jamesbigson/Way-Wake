@@ -3,12 +3,14 @@ package com.example.waywake;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.ImageView;
 import android.widget.TextView;
 
 import androidx.annotation.NonNull;
 import androidx.recyclerview.widget.RecyclerView;
 
 import java.util.List;
+
 
 //public class SuggestionAdapter extends RecyclerView.Adapter<SuggestionAdapter.ViewHolder> {
 //
@@ -88,6 +90,12 @@ public class SuggestionAdapter extends RecyclerView.Adapter<SuggestionAdapter.Pl
         holder.title.setText(item.title);
         holder.subtitle.setText(item.subtitle);
 
+        if (item.isHistory) {
+            holder.icon.setImageResource(R.drawable.ic_history_unselected);
+        } else {
+            holder.icon.setImageResource(android.R.drawable.ic_menu_mylocation);
+        }
+
         holder.itemView.setOnClickListener(v -> listener.onPlaceSelected(item));
     }
 
@@ -98,11 +106,13 @@ public class SuggestionAdapter extends RecyclerView.Adapter<SuggestionAdapter.Pl
 
     public static class PlaceViewHolder extends RecyclerView.ViewHolder {
         TextView title, subtitle;
+        ImageView icon;
 
         public PlaceViewHolder(View itemView) {
             super(itemView);
             title = itemView.findViewById(R.id.placeTitle);
             subtitle = itemView.findViewById(R.id.placeSubtitle);
+            icon = itemView.findViewById(R.id.placeIcon);
         }
     }
 }

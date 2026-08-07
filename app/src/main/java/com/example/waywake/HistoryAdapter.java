@@ -33,7 +33,31 @@ public class HistoryAdapter extends RecyclerView.Adapter<HistoryAdapter.HistoryV
     @Override
     public void onBindViewHolder(@NonNull HistoryViewHolder holder, int position) {
         AlarmItem alarmItem = historyList.get(position);
-        holder.tvLocation.setText(alarmItem.getLocation());
+        String rawLocation = alarmItem.getLocation();
+        String title = rawLocation;
+        String subtitle = "";
+
+        if (rawLocation != null) {
+            String[] parts = rawLocation.split("  ", 2);
+            if (parts.length == 2) {
+                title = parts[0].trim();
+                subtitle = parts[1].trim();
+            } else {
+                parts = rawLocation.split(",", 2);
+                if (parts.length == 2) {
+                    title = parts[0].trim();
+                    subtitle = parts[1].trim();
+                }
+            }
+        }
+
+        holder.tvLocation.setText(title);
+        if (subtitle == null || subtitle.isEmpty()) {
+            holder.tvLocationSub.setVisibility(View.GONE);
+        } else {
+            holder.tvLocationSub.setText(subtitle);
+            holder.tvLocationSub.setVisibility(View.VISIBLE);
+        }
 
         holder.tvTime.setText(formatTime(alarmItem.getTimestamp()));
 
@@ -52,11 +76,12 @@ public class HistoryAdapter extends RecyclerView.Adapter<HistoryAdapter.HistoryV
     }
 
     static class HistoryViewHolder extends RecyclerView.ViewHolder {
-        TextView tvLocation, tvTime, tvDate;
+        TextView tvLocation, tvLocationSub, tvTime, tvDate;
 
         public HistoryViewHolder(@NonNull View itemView) {
             super(itemView);
             tvLocation = itemView.findViewById(R.id.alarmLocation);
+            tvLocationSub = itemView.findViewById(R.id.alarmLocationSub);
             tvTime = itemView.findViewById(R.id.tvTime);
             tvDate = itemView.findViewById(R.id.tvDate);
         }

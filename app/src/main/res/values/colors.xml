@@ -55,5 +55,12 @@
     <color name="purple_950">#2C0077</color>
     <color name="purple_1000">#20004d</color>
 
-
+    <!-- Redesign Colors -->
+    <color name="brand_purple">#6A00FF</color>
+    <color name="brand_purple_dark">#5800D6</color>
+    <color name="card_bg_light">#F5F5F8</color>
+    <color name="text_dark">#1A1A1A</color>
+    <color name="text_secondary">#757575</color>
+    <color name="badge_live_bg">#E8F5E9</color>
+    <color name="badge_live_text">#2E7D32</color>
 </resources>

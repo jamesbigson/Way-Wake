@@ -36,7 +36,7 @@ public class AlarmSettings extends Activity {
     private Vibrator vibrator;
     private Spinner unitSpinner;
 
-    private String selectedUnit = "Meter"; // Default unit
+    private String selectedUnit = "Kilometer"; // Default unit
 
 
     // Key names for SharedPreferences
@@ -48,7 +48,7 @@ public class AlarmSettings extends Activity {
 
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        Configuration.getInstance().setUserAgentValue(getPackageName());
+        Configuration.getInstance().setUserAgentValue("WayWake/1.0 (jamesbigson/Way-Wake)");
         setContentView(R.layout.activity_alarm_settings);
 
         // Initialize UI components
@@ -78,7 +78,7 @@ public class AlarmSettings extends Activity {
             }
         });
 
-        String[] units = {"Meter", "Kilometer"};
+        String[] units = {"Kilometer"};
         ArrayAdapter<String> adapter = new ArrayAdapter<>(this, android.R.layout.simple_spinner_dropdown_item, units);
         unitSpinner.setAdapter(adapter);
 
@@ -128,13 +128,8 @@ public class AlarmSettings extends Activity {
         boolean vibrationEnabled = sharedPreferences.getBoolean(KEY_VIBRATION, true);
         vibrationSwitch.setChecked(vibrationEnabled);
 
-        String distanceUnit = sharedPreferences.getString(KEY_DISTANCE_UNIT, "Meter" );
-
-        if(distanceUnit.equals("Meter")){
-            unitSpinner.setSelection(0);
-        }else{
-            unitSpinner.setSelection(1);
-        }
+        String distanceUnit = sharedPreferences.getString(KEY_DISTANCE_UNIT, "Kilometer" );
+        unitSpinner.setSelection(0);
 
         String alarmSound = sharedPreferences.getString(KEY_ALARM_SOUND, "chiptune");
 

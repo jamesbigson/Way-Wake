@@ -62,7 +62,7 @@ public class AlarmSettingsFragment extends Fragment {
     @Override
     public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
         super.onViewCreated(view, savedInstanceState);
-        Configuration.getInstance().setUserAgentValue("MyLocationApp/1.0");
+        Configuration.getInstance().setUserAgentValue("WayWake/1.0 (jamesbigson/Way-Wake)");
 
         // Initialize UI components
         vibrationSwitch = view.findViewById(R.id.vibration_toggle);
@@ -92,17 +92,10 @@ public class AlarmSettingsFragment extends Fragment {
             }
         });
 
-        String[] units = {"Meter", "Kilometer"};
+        String[] units = {"Kilometer"};
         ArrayAdapter<String> adapter = new ArrayAdapter<>(requireContext(), android.R.layout.simple_spinner_dropdown_item, units);
         unitSpinner.setAdapter(adapter);
-
-        if(sharedPreferences.getString(KEY_DISTANCE_UNIT, "Kilometer" ).equals("Kilometer")){
-            distance_unit_position = 1 ;
-        }
-        else{
-            distance_unit_position = 0 ;
-        }
-        unitSpinner.setSelection(distance_unit_position);
+        unitSpinner.setSelection(0);
 
         // Set item selection listener
         unitSpinner.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
@@ -146,13 +139,8 @@ public class AlarmSettingsFragment extends Fragment {
         boolean vibrationEnabled = sharedPreferences.getBoolean(KEY_VIBRATION, true);
         vibrationSwitch.setChecked(vibrationEnabled);
 
-        String distanceUnit = sharedPreferences.getString(KEY_DISTANCE_UNIT, "Meter" );
-
-        if(distanceUnit.equals("Meter")){
-            unitSpinner.setSelection(0);
-        }else{
-            unitSpinner.setSelection(1);
-        }
+        String distanceUnit = sharedPreferences.getString(KEY_DISTANCE_UNIT, "Kilometer" );
+        unitSpinner.setSelection(0);
 
         String alarmSound = sharedPreferences.getString(KEY_ALARM_SOUND, "chiptune");
 

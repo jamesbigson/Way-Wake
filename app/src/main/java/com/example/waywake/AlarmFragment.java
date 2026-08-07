@@ -22,6 +22,8 @@ import android.content.Intent;
 import android.content.IntentFilter;
 import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
+import android.content.res.ColorStateList;
+import android.graphics.Color;
 
 import android.location.Address;
 import android.location.Geocoder;
@@ -31,6 +33,7 @@ import android.net.Uri;
 
 import android.os.Build;
 import android.os.Bundle;
+import android.os.PowerManager;
 
 import android.text.Editable;
 import android.text.TextWatcher;
@@ -103,10 +106,21 @@ public class AlarmFragment extends Fragment {
     private TextView statusText;
     private String distanceUnit;
     private TextView radiusLabel;
+    private SeekBar radiusSeekBar;
+    private ImageButton refreshRadiusButton;
     Button setAlarmButton;
     private Vibrator vibrator;
     private MediaPlayer mediaPlayer;
     private int destRadius = 5000;
+    private int activeAlarmRadius = -1;
+
+    private String formatKm(double km) {
+        if (km == (long) km) {
+            return String.format(Locale.US, "%d km", (long) km);
+        } else {
+            return String.format(Locale.US, "%.1f km", km);
+        }
+    }
     private boolean isFirstAlarm = true;
 //    private AutoCompleteTextView autoCompleteTextView;
     private boolean isMonitorRunning = false;
@@ -117,7 +131,8 @@ public class AlarmFragment extends Fragment {
     private AlertDialog alarmDialog;
     private boolean showMyLocation = true;
     private CompassOverlay compassOverlay;
-    ActivityResultLauncher<Intent> searchLauncher;
+    private ActivityResultLauncher<Intent> searchLauncher;
+    private boolean isAlarmSet = false;
     private static final String HISTORY_PREF_NAME = "history_pref";
     public static final int LOCATION_PERMISSION_REQUEST_CODE = 1001;
     public static final String USER_SETTINGS_PREFS_NAME = "user_settings";
@@ -126,26 +141,47 @@ public class AlarmFragment extends Fragment {
     @Override
     public void onCreate(@Nullable Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        registerStopAlarmReceiver();
+        registerReceivers();
     }
 
-    private void registerStopAlarmReceiver() {
-        IntentFilter filter = new IntentFilter("STOP_ALARM_EVENT");
+    private void registerReceivers() {
+        IntentFilter filter = new IntentFilter();
+        filter.addAction("STOP_ALARM_EVENT");
+        filter.addAction(ForegroundService.BROADCAST_LOCATION_UPDATE);
+        filter.addAction(ForegroundService.BROADCAST_ALARM_TRIGGERED);
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            requireContext().registerReceiver(stopAlarmReceiver, filter, Context.RECEIVER_EXPORTED);
+            requireContext().registerReceiver(locationUpdateReceiver, filter, Context.RECEIVER_EXPORTED);
         } else {
-            requireContext().registerReceiver(stopAlarmReceiver, filter);
+            requireContext().registerReceiver(locationUpdateReceiver, filter);
         }
     }
 
-    private final android.content.BroadcastReceiver stopAlarmReceiver = new android.content.BroadcastReceiver() {
+    private final android.content.BroadcastReceiver locationUpdateReceiver = new android.content.BroadcastReceiver() {
         @Override
         public void onReceive(Context context, Intent intent) {
-            Log.d("AlarmFragment", "Broadcast received: STOP_ALARM_EVENT in instance " + AlarmFragment.this.hashCode());
-            stopAlarm();
-            NotificationManager notificationManager = (NotificationManager) context.getSystemService(Context.NOTIFICATION_SERVICE);
-            if (notificationManager != null) {
-                notificationManager.cancel(2);
+            if (intent == null || intent.getAction() == null) return;
+            String action = intent.getAction();
+            Log.d("AlarmFragment", "Broadcast received: " + action + " in instance " + AlarmFragment.this.hashCode());
+
+            if ("STOP_ALARM_EVENT".equals(action)) {
+                stopAlarm();
+                NotificationManager notificationManager = (NotificationManager) context.getSystemService(Context.NOTIFICATION_SERVICE);
+                if (notificationManager != null) {
+                    notificationManager.cancel(2);
+                }
+            } else if (ForegroundService.BROADCAST_LOCATION_UPDATE.equals(action)) {
+                String distanceStr = intent.getStringExtra("distance_str");
+                if (distanceStr != null && statusText != null) {
+                    statusText.setText("Distance to destination: " + distanceStr);
+                }
+                double lat = intent.getDoubleExtra("latitude", 0.0);
+                double lng = intent.getDoubleExtra("longitude", 0.0);
+                if (showMyLocation && mapView != null && (lat != 0.0 || lng != 0.0)) {
+                    GeoPoint currentLoc = new GeoPoint(lat, lng);
+                    mapView.getController().animateTo(currentLoc);
+                }
+            } else if (ForegroundService.BROADCAST_ALARM_TRIGGERED.equals(action)) {
+                playAlarm();
             }
         }
     };
@@ -156,7 +192,7 @@ public class AlarmFragment extends Fragment {
     public View onCreateView(@NonNull LayoutInflater inflater, @Nullable ViewGroup container, @Nullable Bundle savedInstanceState) {
         View view = inflater.inflate(R.layout.activity_alarm, container, false);
 
-        Configuration.getInstance().setUserAgentValue("MyLocationApp/1.0");
+        Configuration.getInstance().setUserAgentValue("WayWake/1.0 (jamesbigson/Way-Wake)");
 
         mapView = view.findViewById(R.id.map);
         locationInput = view.findViewById(R.id.location_input);
@@ -165,7 +201,16 @@ public class AlarmFragment extends Fragment {
         radiusLabel = view.findViewById(R.id.radius_label);
         vibrator = (Vibrator) requireContext().getSystemService(VIBRATOR_SERVICE);
 
-        SeekBar radiusSeekBar = view.findViewById(R.id.radius_seekbar);
+        radiusSeekBar = view.findViewById(R.id.radius_seekbar);
+        refreshRadiusButton = view.findViewById(R.id.refresh_radius_button);
+        refreshRadiusButton.setOnClickListener(v -> {
+            if (isAlarmSet && destination != null) {
+                startAlarmMonitor();
+                activeAlarmRadius = destRadius;
+                updateRefreshButtonVisibility();
+                Toast.makeText(requireContext(), "Alarm radius updated!", Toast.LENGTH_SHORT).show();
+            }
+        });
         ImageButton myLocationButton = view.findViewById(R.id.my_location_button);
         ImageButton mapLocationButton = view.findViewById(R.id.map_location_button);
         ImageButton threeDotMenu = view.findViewById(R.id.more_menu);
@@ -176,7 +221,7 @@ public class AlarmFragment extends Fragment {
         sharedPreferences = requireActivity().getSharedPreferences(HISTORY_PREF_NAME, MODE_PRIVATE);
         editor = sharedPreferences.edit();
         userSettingsSP = requireActivity().getSharedPreferences(USER_SETTINGS_PREFS_NAME, MODE_PRIVATE);
-        distanceUnit = userSettingsSP.getString(KEY_DISTANCE_UNIT, "Meter" );
+        distanceUnit = userSettingsSP.getString(KEY_DISTANCE_UNIT, "Kilometer" );
 
         mapView.setMultiTouchControls(true);
         myLocationButton.setSelected(true);
@@ -188,10 +233,8 @@ public class AlarmFragment extends Fragment {
             Log.d("Permission","Permission Error");
         }
 
-        if(distanceUnit.equals("Kilometer")){
-            radiusLabel.setText("20 Kilometer");
-            destRadius = 20000;
-        }
+        radiusLabel.setText(formatKm(radiusSeekBar.getProgress() * 0.5));
+        destRadius = radiusSeekBar.getProgress() * 500;
 
         // Start the foreground service for background tracking
         startLocationService();
@@ -249,6 +292,11 @@ public class AlarmFragment extends Fragment {
 //            mapView.callOnClick();
 
 
+            if (isAlarmSet) {
+                showStopAlarmConfirmationDialog();
+                return;
+            }
+
             String locationName = locationInput.getText().toString();
 
             addHistory(locationName);
@@ -269,11 +317,10 @@ public class AlarmFragment extends Fragment {
             @SuppressLint("SetTextI18n")
             @Override
             public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
-                int increment = 500;
-                if(distanceUnit.equals("Kilometer")){
-                    increment = 2;
-                }
-                radiusLabel.setText(progress * increment + " " + distanceUnit );
+                double km = progress * 0.5;
+                radiusLabel.setText(formatKm(km));
+                destRadius = progress * 500;
+                updateRefreshButtonVisibility();
             }
 
             @Override
@@ -284,22 +331,17 @@ public class AlarmFragment extends Fragment {
             @Override
             public void onStopTrackingTouch(SeekBar seekBar) {
                 // Update the circle radius once the user stops adjusting
-                int radius = seekBar.getProgress();
-                if(distanceUnit.equals("Kilometer")){
-                    radius *= 2000;
-                }else{
-                    radius *= 500;
-                }
-
-                destRadius = radius;
+                int progress = seekBar.getProgress();
+                destRadius = progress * 500;
                 if (destination != null) {
                     mapView.invalidate();
-                    addMarkerWithCircle(destination, "Destination", radius);
+                    addMarkerWithCircle(destination, "Destination", destRadius);
                 }
 
                 if (!isFirstAlarm && !isMonitorRunning) {
                     startAlarmMonitor();
                 }
+                updateRefreshButtonVisibility();
             }
         });
 
@@ -317,6 +359,9 @@ public class AlarmFragment extends Fragment {
                         Intent data = result.getData();
                         if (data != null) {
                             String place = data.getStringExtra("selected_place");
+                            if (isAlarmSet) {
+                                resetAlarmState();
+                            }
                             locationInput.setText(place);   // Set the returned text
                             setAlarmButton.callOnClick();
                         }
@@ -376,8 +421,12 @@ public class AlarmFragment extends Fragment {
                     return true;
                 }
                 else if (item.getItemId()==R.id.stop_alarm) {
-                    destination = null;
-                    locationInput.setText("");
+                    if (isAlarmSet) {
+                        showStopAlarmConfirmationDialog();
+                    } else {
+                        stopAlarm();
+                        locationInput.setText("");
+                    }
                     return true;
                 } else{
                     return false;
@@ -492,23 +541,68 @@ public class AlarmFragment extends Fragment {
         mapView.invalidate();
     }
 
+    private void updateRefreshButtonVisibility() {
+        if (refreshRadiusButton == null) return;
+        if (isAlarmSet && activeAlarmRadius != -1 && destRadius != activeAlarmRadius) {
+            refreshRadiusButton.setVisibility(View.VISIBLE);
+        } else {
+            refreshRadiusButton.setVisibility(View.GONE);
+        }
+    }
+
+    private void syncActiveAlarmState() {
+        if (isAlarmSet) return;
+        if (getActivity() == null) return;
+        SharedPreferences activeAlarmSP = requireActivity().getSharedPreferences("active_alarm_pref", MODE_PRIVATE);
+        boolean isActive = activeAlarmSP.getBoolean("is_active", false);
+        if (isActive) {
+            double lat = activeAlarmSP.getFloat("dest_lat", 0.0f);
+            double lng = activeAlarmSP.getFloat("dest_lng", 0.0f);
+            if (lat != 0.0 && lng != 0.0) {
+                destination = new GeoPoint(lat, lng);
+                destRadius = activeAlarmSP.getInt("dest_radius", 5000);
+                activeAlarmRadius = destRadius;
+                isAlarmSet = true;
+                isMonitorRunning = true;
+
+                String destName = activeAlarmSP.getString("dest_name", "Selected Destination");
+                if (locationInput != null) {
+                    locationInput.setText(destName);
+                }
+
+                if (radiusSeekBar != null) {
+                    radiusSeekBar.setProgress(destRadius / 500);
+                }
+                if (radiusLabel != null) {
+                    radiusLabel.setText(formatKm(destRadius / 1000.0));
+                }
+
+                if (setAlarmButton != null) {
+                    setAlarmButton.setText("Stop Alarm");
+                    setAlarmButton.setBackgroundResource(R.drawable.button_curved_red);
+                    setAlarmButton.setBackgroundTintList(ColorStateList.valueOf(Color.parseColor("#E53935")));
+                }
+
+                if (mapView != null) {
+                    addMarkerWithCircle(destination, "Destination", destRadius);
+                    mapView.getController().setCenter(destination);
+                }
+                updateRefreshButtonVisibility();
+            }
+        }
+    }
+
     @SuppressLint("SetTextI18n")
     @Override
     public void onResume() {
         super.onResume();
 
-        if(!isMonitorRunning){
-            distanceUnit = userSettingsSP.getString(KEY_DISTANCE_UNIT, "Meter" );
+        syncActiveAlarmState();
 
-            if (distanceUnit.equals("Kilometer")) {
-                if(destRadius ==5000){
-                    radiusLabel.setText("20 Kilometer");
-                }
-            } else {
-                if(destRadius ==20000){
-                    radiusLabel.setText("5000 Meter");
-                }
-            }
+        if(!isMonitorRunning && radiusSeekBar != null){
+            int progress = radiusSeekBar.getProgress();
+            radiusLabel.setText(formatKm(progress * 0.5));
+            destRadius = progress * 500;
         }
 
         if (mapView != null) {
@@ -542,7 +636,7 @@ public class AlarmFragment extends Fragment {
         stopAlarm();
         isMonitorRunning = false;
         try {
-            requireContext().unregisterReceiver(stopAlarmReceiver);
+            requireContext().unregisterReceiver(locationUpdateReceiver);
         } catch (Exception e) {
             Log.e("AlarmFragment", "Error unregistering receiver", e);
         }
@@ -583,6 +677,47 @@ public class AlarmFragment extends Fragment {
         if (alarmDialog != null && alarmDialog.isShowing()) {
             alarmDialog.dismiss();
             alarmDialog = null;
+        }
+
+        resetAlarmState();
+    }
+
+    private void showStopAlarmConfirmationDialog() {
+        if (!isAdded()) return;
+        new AlertDialog.Builder(requireContext())
+                .setTitle("Stop Alarm")
+                .setMessage("Are you sure you want to stop the alarm?")
+                .setPositiveButton("Stop Alarm", (dialog, which) -> {
+                    stopAlarm();
+                    Toast.makeText(requireContext(), "Alarm stopped", Toast.LENGTH_SHORT).show();
+                })
+                .setNegativeButton("Cancel", (dialog, which) -> dialog.dismiss())
+                .show();
+    }
+
+    private void resetAlarmState() {
+        isAlarmSet = false;
+        isMonitorRunning = false;
+        activeAlarmRadius = -1;
+        updateRefreshButtonVisibility();
+
+        if (circle != null) {
+            circle.setFillColor(0x4D808080);
+            circle.setStrokeColor(0xFF808080);
+            if (mapView != null) {
+                mapView.invalidate();
+            }
+        }
+
+        if (isAdded() && getView() != null) {
+            if (setAlarmButton != null) {
+                setAlarmButton.setText("Set Alarm");
+                setAlarmButton.setBackgroundResource(R.drawable.button_curved);
+                setAlarmButton.setBackgroundTintList(ColorStateList.valueOf(Color.parseColor("#6300EE")));
+            }
+            if (statusText != null) {
+                statusText.setText("Alarm not set");
+            }
         }
     }
 
@@ -660,54 +795,38 @@ public class AlarmFragment extends Fragment {
         }
 
         isMonitorRunning = true;
-        GeoPoint location, destinationLatLng;
+        checkBatteryOptimizations();
 
-        location = locationOverlay.getMyLocation();
-        destinationLatLng = destination;
-
-        if (location != null && destinationLatLng != null) {
-            float[] results = new float[1];
-            Location.distanceBetween(location.getLatitude(), location.getLongitude(),
-                    destinationLatLng.getLatitude(), destinationLatLng.getLongitude(), results);
-
-            float distance = results[0];
-
-            String distanceStr;
-            if(distanceUnit.equals("Kilometer")){
-                distanceStr = String.format("%.1f", distance/1000)  + " " + "km";
-            }else{
-                distanceStr = (int) distance + " " + "m";
-            }
-            statusText.setText("Distance to destination: " + distanceStr);
-
-            // Update Foreground Service Notification
-            updateForegroundServiceNotification(distanceStr);
-
-
-            if(showMyLocation){
-                // Move the map to the current location on the first fix
-                GeoPoint currentLocation = locationOverlay.getMyLocation();
-
-                if (currentLocation != null) {
-                    mapView.getController().animateTo(currentLocation);
-                    mapView.getController().setZoom(17.0);
-                }
-            }
-
-            if (distance <= destRadius) {
-                playAlarm();
-                isFirstAlarm = false;
-                isMonitorRunning = false;
-            } else {
-                // Repeat checking every 5 seconds
-                statusText.postDelayed(this::startAlarmMonitor, 5000);
-            }
-        }
-        else{
-            statusText.setText("Alarm not set");
-            isMonitorRunning = false;
+        Intent serviceIntent = new Intent(requireContext(), ForegroundService.class);
+        serviceIntent.setAction(ForegroundService.ACTION_START_MONITORING);
+        serviceIntent.putExtra(ForegroundService.EXTRA_DEST_LAT, destination.getLatitude());
+        serviceIntent.putExtra(ForegroundService.EXTRA_DEST_LNG, destination.getLongitude());
+        serviceIntent.putExtra(ForegroundService.EXTRA_DEST_RADIUS, destRadius);
+        if (locationInput != null && !locationInput.getText().toString().isEmpty()) {
+            serviceIntent.putExtra(ForegroundService.EXTRA_DEST_NAME, locationInput.getText().toString());
         }
 
+        String alarmSound = userSettingsSP.getString(KEY_ALARM_SOUND, "chiptune");
+        serviceIntent.putExtra(ForegroundService.EXTRA_ALARM_SOUND, alarmSound);
+        boolean vibrationEnabled = userSettingsSP.getBoolean(KEY_VIBRATION, true);
+        serviceIntent.putExtra(ForegroundService.EXTRA_VIBRATION_ENABLED, vibrationEnabled);
+
+        ContextCompat.startForegroundService(requireContext(), serviceIntent);
+    }
+
+    private void checkBatteryOptimizations() {
+        if (!isAdded()) return;
+        try {
+            PowerManager pm = (PowerManager) requireContext().getSystemService(Context.POWER_SERVICE);
+            if (pm != null && !pm.isIgnoringBatteryOptimizations(requireContext().getPackageName())) {
+                @SuppressLint("BatteryLife")
+                Intent intent = new Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS);
+                intent.setData(Uri.parse("package:" + requireContext().getPackageName()));
+                startActivity(intent);
+            }
+        } catch (Exception e) {
+            Log.e("AlarmFragment", "Error requesting battery optimization exemption", e);
+        }
     }
 
     @SuppressLint("SetTextI18n")
@@ -733,22 +852,31 @@ public class AlarmFragment extends Fragment {
                 destination = new GeoPoint(latitude, longitude);
                 GeoPoint currentLocation = locationOverlay.getMyLocation();
                 // addMarker(destination, "Destination");
+                isAlarmSet = true;
                 addMarkerWithCircle(destination, "Destination", destRadius);
 
                 mapView.getController().setCenter(destination);
                 mapView.getController().animateTo(destination);
 
-                BoundingBox box = BoundingBox.fromGeoPoints(
-                        Arrays.asList(currentLocation, destination)
-                );
+                if (currentLocation != null) {
+                    BoundingBox box = BoundingBox.fromGeoPoints(
+                            Arrays.asList(currentLocation, destination)
+                    );
 
-                mapView.zoomToBoundingBox(box, true, 150);
+                    mapView.zoomToBoundingBox(box, true, 150);
+                }
 
                 Toast.makeText(requireContext(), "Destination set on map!", Toast.LENGTH_SHORT).show();
 
                 if (!isMonitorRunning) {
                     startAlarmMonitor();
                 }
+
+                setAlarmButton.setText("Stop Alarm");
+                setAlarmButton.setBackgroundResource(R.drawable.button_curved_red);
+                setAlarmButton.setBackgroundTintList(ColorStateList.valueOf(Color.parseColor("#E53935")));
+                activeAlarmRadius = destRadius;
+                updateRefreshButtonVisibility();
 
             } else {
                 Toast.makeText(requireContext(), "Location not found", Toast.LENGTH_SHORT).show();
@@ -768,8 +896,13 @@ public class AlarmFragment extends Fragment {
         // Add a transparent circle around the marker
         circle = new Polygon(mapView);
         circle.setPoints(Polygon.pointsAsCircle(point, radiusMeters)); // Convert meters to degrees
-        circle.setFillColor(0x4D9E73FF);
-        circle.setStrokeColor(0xFF9E73FF);
+        if (isAlarmSet) {
+            circle.setFillColor(0x4D9E73FF);
+            circle.setStrokeColor(0xFF9E73FF);
+        } else {
+            circle.setFillColor(0x4D808080);
+            circle.setStrokeColor(0xFF808080);
+        }
         circle.setStrokeWidth(2.0f);
         mapView.getOverlays().add(circle);
 
@@ -859,9 +992,18 @@ public class AlarmFragment extends Fragment {
 
         long timestamp = System.currentTimeMillis();
         Set<String> historySet = sharedPreferences.getStringSet("historyList", new HashSet<>());
-        historySet.add(location + ";" + timestamp);
+        Set<String> updatedSet = new HashSet<>();
+        if (historySet != null) {
+            for (String item : historySet) {
+                String[] parts = item.split(";", 2);
+                if (parts.length > 0 && !parts[0].trim().equalsIgnoreCase(location.trim())) {
+                    updatedSet.add(item);
+                }
+            }
+        }
+        updatedSet.add(location + ";" + timestamp);
 
-        editor.putStringSet("historyList", historySet);
+        editor.putStringSet("historyList", updatedSet);
         editor.apply();
 
         Log.d("HistoryFragment", "History added: " + location);
@@ -875,6 +1017,9 @@ public class AlarmFragment extends Fragment {
             double latitude = data.getDoubleExtra("latitude", 0.0);
             double longitude = data.getDoubleExtra("longitude", 0.0);
 
+            if (isAlarmSet) {
+                resetAlarmState();
+            }
             // Use the selected location as needed
             userSelectedLocation(new GeoPoint(latitude,longitude));
         }
@@ -888,6 +1033,7 @@ public class AlarmFragment extends Fragment {
         destination = location;
 
         if(destination!=null){
+            isAlarmSet = true;
             addMarkerWithCircle(destination, "Destination", destRadius);
 
             mapView.getController().setCenter(destination);
@@ -896,6 +1042,12 @@ public class AlarmFragment extends Fragment {
             if (!isMonitorRunning) {
                 startAlarmMonitor();
             }
+
+            setAlarmButton.setText("Stop Alarm");
+            setAlarmButton.setBackgroundResource(R.drawable.button_curved_red);
+            setAlarmButton.setBackgroundTintList(ColorStateList.valueOf(Color.parseColor("#E53935")));
+            activeAlarmRadius = destRadius;
+            updateRefreshButtonVisibility();
         }
 
     }
@@ -935,11 +1087,17 @@ public class AlarmFragment extends Fragment {
     }
     
     public void setAlarm(String placeInput){
+        if (isAlarmSet) {
+            resetAlarmState();
+        }
         locationInput.setText(placeInput);
         setAlarmButton.callOnClick();
     }
 
     public void setDestination(double latitude, double longitude){
+        if (isAlarmSet) {
+            resetAlarmState();
+        }
         destination = new GeoPoint(latitude, longitude);
         setAlarm("Selected destination");
     }

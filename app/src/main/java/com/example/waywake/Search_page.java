@@ -63,14 +63,40 @@ public class Search_page extends AppCompatActivity {
             searchBox.setText(location);
         }
 
+        if(searchBox.getText().toString().isEmpty()){
+            clearTextButton.setVisibility(View.GONE);
+        }else{
+            clearTextButton.setVisibility(View.VISIBLE);
+        }
+
         adapter = new SuggestionAdapter(list, item -> {
             String place;
-            if ("History".equals(item.subtitle)) {
+            if (item.originalText != null) {
+                place = item.originalText;
+            } else if (item.isHistory || "History".equals(item.subtitle)) {
                 place = item.title;
             } else {
-                place = (item.subtitle == null || item.subtitle.isEmpty()) 
-                        ? item.title 
-                        : String.format("%s %s", item.title, item.subtitle);
+                if (item.subtitle == null || item.subtitle.isEmpty()) {
+                    place = item.title;
+                } else {
+                    String cleanSubtitle = item.subtitle.replaceAll("\\b\\d+\\b", "");
+                    String[] words = cleanSubtitle.replaceAll("[^a-zA-Z0-9\\s]", " ").trim().split("\\s+");
+                    StringBuilder sb = new StringBuilder();
+                    for (int i = Math.max(0, words.length - 4); i < words.length; i++) {
+                        if (!words[i].trim().isEmpty()) {
+                            if (sb.length() > 0) {
+                                sb.append(" ");
+                            }
+                            sb.append(words[i]);
+                        }
+                    }
+                    String lastFourWords = sb.toString();
+                    if (lastFourWords.isEmpty()) {
+                        place = item.title;
+                    } else {
+                        place = item.title + " " + lastFourWords;
+                    }
+                }
             }
             searchBox.setText(place);
 
@@ -148,14 +174,50 @@ public class Search_page extends AppCompatActivity {
                 }
             });
 
+            Set<String> seenKeys = new HashSet<>();
             for (String item : sortedHistory) {
                 String[] parts = item.split(";", 2);
                 if (parts.length >= 1) {
-                    list.add(new PlaceItem(parts[0], "History"));
+                    String rawLocation = parts[0].trim();
+                    if (!rawLocation.isEmpty()) {
+                        PlaceItem placeItem = parseHistoryItem(parts[0]);
+                        String key = (placeItem.title + "||" + placeItem.subtitle).toLowerCase();
+                        String rawKey = rawLocation.toLowerCase();
+                        if (!seenKeys.contains(key) && !seenKeys.contains(rawKey)) {
+                            seenKeys.add(key);
+                            seenKeys.add(rawKey);
+                            list.add(placeItem);
+                        }
+                    }
                 }
             }
         }
         runOnUiThread(adapter::notifyDataSetChanged);
+    }
+
+    private PlaceItem parseHistoryItem(String rawLocation) {
+        if (rawLocation == null) {
+            return new PlaceItem("", "History", true, "");
+        }
+        
+        // Try to split by double space first, since that's how suggestion items combine them (with formatting)
+        String[] parts = rawLocation.split("  ", 2);
+        if (parts.length == 2) {
+            String title = parts[0].trim();
+            String subtitle = parts[1].trim();
+            return new PlaceItem(title, "History • " + subtitle, true, rawLocation);
+        }
+        
+        // Otherwise try to split by the first comma
+        parts = rawLocation.split(",", 2);
+        if (parts.length == 2) {
+            String title = parts[0].trim();
+            String subtitle = parts[1].trim();
+            return new PlaceItem(title, "History • " + subtitle, true, rawLocation);
+        }
+        
+        // If no double space and no comma, use the whole string as title
+        return new PlaceItem(rawLocation, "History", true, rawLocation);
     }
 
     private void fetchLocationIQ(String query) {
@@ -164,6 +226,20 @@ public class Search_page extends AppCompatActivity {
                 String urlStr = "https://us1.locationiq.com/v1/autocomplete.php?key=" + LOCATIONIQ_API_KEY + "&q="
                         + URLEncoder.encode(query, "UTF-8")
                         + "&limit=8";
+
+                SharedPreferences sharedPreferences = getSharedPreferences("history_pref", Context.MODE_PRIVATE);
+                if (sharedPreferences.contains("current_latitude") && sharedPreferences.contains("current_longitude")) {
+                    float lat = sharedPreferences.getFloat("current_latitude", 0.0f);
+                    float lon = sharedPreferences.getFloat("current_longitude", 0.0f);
+                    
+                    // Construct a viewbox: 1.0 degree bounding box around the coordinates (~111km)
+                    double minLat = lat - 1.0;
+                    double maxLat = lat + 1.0;
+                    double minLon = lon - 1.0;
+                    double maxLon = lon + 1.0;
+                    
+                    urlStr += "&viewbox=" + minLon + "," + minLat + "," + maxLon + "," + maxLat;
+                }
 
                 URL url = new URL(urlStr);
                 HttpURLConnection conn = (HttpURLConnection) url.openConnection();
