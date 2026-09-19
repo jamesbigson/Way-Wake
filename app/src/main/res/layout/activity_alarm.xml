@@ -111,18 +111,31 @@
         </LinearLayout>
 
         <!-- Set Alarm Button -->
-        <Button
-            android:id="@+id/set_alarm_button"
+        <FrameLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="12dp"
-            android:background="@drawable/button_curved"
-            app:backgroundTint="@null"
-            android:text="Set Alarm"
-            android:textAllCaps="false"
-            android:textColor="@color/white"
-            android:textSize="16sp"
-            android:textStyle="bold" />
+            android:layout_marginTop="12dp">
+
+            <Button
+                android:id="@+id/set_alarm_button"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:background="@drawable/button_curved"
+                app:backgroundTint="@null"
+                android:text="Set Alarm"
+                android:textAllCaps="false"
+                android:textColor="@color/white"
+                android:textSize="16sp"
+                android:textStyle="bold" />
+
+            <ProgressBar
+                android:id="@+id/set_alarm_progress"
+                android:layout_width="24dp"
+                android:layout_height="24dp"
+                android:layout_gravity="center"
+                android:indeterminateTint="@color/white"
+                android:visibility="gone" />
+        </FrameLayout>
 
         <!-- Radius -->
         <TextView
@@ -213,7 +226,8 @@
                 android:layout_width="match_parent"
                 android:layout_height="0dp"
                 android:background="@color/gray"
-                app:layout_constraintTop_toTopOf="parent" />
+                app:layout_constraintTop_toTopOf="parent"
+                tools:ignore="MissingClass" />
 
             <ImageButton
                 android:id="@+id/my_location_button"

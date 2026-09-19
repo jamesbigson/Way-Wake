@@ -49,6 +49,7 @@ public class MainPage extends AppCompatActivity implements NetworkChangeReceiver
     private NetworkChangeReceiver networkChangeReceiver;
     private Snackbar snackbar;
     private FirebaseAnalytics mFirebaseAnalytics;
+    private AlertDialog updateDialog;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -135,6 +136,9 @@ public class MainPage extends AppCompatActivity implements NetworkChangeReceiver
         String updateMessage = mConfig.getString("update_message");
         String updateUrl = mConfig.getString("update_url");
 
+        if (latestVersion == null || latestVersion.isEmpty()) {
+            return;
+        }
 
         String currentVersion = BuildConfig.VERSION_NAME;
 
@@ -144,17 +148,22 @@ public class MainPage extends AppCompatActivity implements NetworkChangeReceiver
     }
 
     private void showUpdatePopup(String msg, String url) {
+        if (updateDialog != null && updateDialog.isShowing()) {
+            return;
+        }
         AlertDialog.Builder builder = new AlertDialog.Builder(this);
         builder.setTitle("Update Required");
         builder.setMessage(msg);
         builder.setCancelable(false);
         builder.setPositiveButton("Update", null);
 
-        AlertDialog dialog = builder.create();
-        dialog.show();
+        updateDialog = builder.create();
+        updateDialog.show();
 
-        dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(v -> {
-            startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse(url)));
+        updateDialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(v -> {
+            if (url != null && !url.isEmpty()) {
+                startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse(url)));
+            }
         });
     }
 

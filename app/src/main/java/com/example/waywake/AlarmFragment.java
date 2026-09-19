@@ -48,6 +48,7 @@ import android.widget.EditText;
 import android.widget.ImageButton;
 import android.widget.ImageView;
 import android.widget.PopupMenu;
+import android.widget.ProgressBar;
 import android.widget.SeekBar;
 import android.widget.TextView;
 import android.widget.Toast;
@@ -76,6 +77,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Set;
+import java.util.concurrent.Executors;
 
 import android.os.Vibrator;
 import android.view.View;
@@ -109,6 +111,7 @@ public class AlarmFragment extends Fragment {
     private SeekBar radiusSeekBar;
     private ImageButton refreshRadiusButton;
     Button setAlarmButton;
+    private ProgressBar setAlarmProgress;
     private Vibrator vibrator;
     private MediaPlayer mediaPlayer;
     private int destRadius = 5000;
@@ -198,6 +201,7 @@ public class AlarmFragment extends Fragment {
         locationInput = view.findViewById(R.id.location_input);
         statusText = view.findViewById(R.id.status_text);
         setAlarmButton = view.findViewById(R.id.set_alarm_button);
+        setAlarmProgress = view.findViewById(R.id.set_alarm_progress);
         radiusLabel = view.findViewById(R.id.radius_label);
         vibrator = (Vibrator) requireContext().getSystemService(VIBRATOR_SERVICE);
 
@@ -710,7 +714,12 @@ public class AlarmFragment extends Fragment {
         }
 
         if (isAdded() && getView() != null) {
+            if (setAlarmProgress != null) {
+                setAlarmProgress.setVisibility(View.GONE);
+            }
             if (setAlarmButton != null) {
+                setAlarmButton.setEnabled(true);
+                setAlarmButton.setTextColor(Color.WHITE);
                 setAlarmButton.setText("Set Alarm");
                 setAlarmButton.setBackgroundResource(R.drawable.button_curved);
                 setAlarmButton.setBackgroundTintList(ColorStateList.valueOf(Color.parseColor("#6300EE")));
@@ -840,50 +849,82 @@ public class AlarmFragment extends Fragment {
     }
 
     private void getCoordinatesFromLocationName(String locationName) {
-        Geocoder geocoder = new Geocoder(requireContext(), Locale.getDefault());
-        try {
-            // Fetch address list using location name
-            List<Address> addresses = geocoder.getFromLocationName(locationName, 1);
-            if (addresses != null && !addresses.isEmpty()) {
-                Address address = addresses.get(0);
-                double latitude = address.getLatitude();
-                double longitude = address.getLongitude();
-
-                destination = new GeoPoint(latitude, longitude);
-                GeoPoint currentLocation = locationOverlay.getMyLocation();
-                // addMarker(destination, "Destination");
-                isAlarmSet = true;
-                addMarkerWithCircle(destination, "Destination", destRadius);
-
-                mapView.getController().setCenter(destination);
-                mapView.getController().animateTo(destination);
-
-                if (currentLocation != null) {
-                    BoundingBox box = BoundingBox.fromGeoPoints(
-                            Arrays.asList(currentLocation, destination)
-                    );
-
-                    mapView.zoomToBoundingBox(box, true, 150);
-                }
-
-                Toast.makeText(requireContext(), "Destination set on map!", Toast.LENGTH_SHORT).show();
-
-                if (!isMonitorRunning) {
-                    startAlarmMonitor();
-                }
-
-                setAlarmButton.setText("Stop Alarm");
-                setAlarmButton.setBackgroundResource(R.drawable.button_curved_red);
-                setAlarmButton.setBackgroundTintList(ColorStateList.valueOf(Color.parseColor("#E53935")));
-                activeAlarmRadius = destRadius;
-                updateRefreshButtonVisibility();
-
-            } else {
-                Toast.makeText(requireContext(), "Location not found", Toast.LENGTH_SHORT).show();
-            }
-        } catch (IOException e) {
-            e.printStackTrace();
+        if (setAlarmProgress != null) {
+            setAlarmProgress.setVisibility(View.VISIBLE);
         }
+        if (setAlarmButton != null) {
+            setAlarmButton.setEnabled(false);
+            setAlarmButton.setTextColor(Color.TRANSPARENT);
+        }
+
+        Executors.newSingleThreadExecutor().execute(() -> {
+            Geocoder geocoder = new Geocoder(requireContext(), Locale.getDefault());
+            List<Address> addresses = null;
+            try {
+                // Fetch address list using location name
+                addresses = geocoder.getFromLocationName(locationName, 1);
+            } catch (IOException e) {
+                Log.e("AlarmFragment", "Error getting location from name", e);
+            }
+
+            final List<Address> finalAddresses = addresses;
+
+            if (isAdded() && getActivity() != null) {
+                requireActivity().runOnUiThread(() -> {
+                    if (setAlarmProgress != null) {
+                        setAlarmProgress.setVisibility(View.GONE);
+                    }
+                    if (setAlarmButton != null) {
+                        setAlarmButton.setEnabled(true);
+                        setAlarmButton.setTextColor(Color.WHITE);
+                    }
+
+                    if (finalAddresses != null && !finalAddresses.isEmpty()) {
+                        Address address = finalAddresses.get(0);
+                        double latitude = address.getLatitude();
+                        double longitude = address.getLongitude();
+
+                        destination = new GeoPoint(latitude, longitude);
+                        GeoPoint currentLocation = (locationOverlay != null) ? locationOverlay.getMyLocation() : null;
+                        
+                        isAlarmSet = true;
+                        addMarkerWithCircle(destination, "Destination", destRadius);
+
+                        if (mapView != null) {
+                            mapView.getController().setCenter(destination);
+                            mapView.getController().animateTo(destination);
+
+                            if (currentLocation != null) {
+                                BoundingBox box = BoundingBox.fromGeoPoints(
+                                        Arrays.asList(currentLocation, destination)
+                                );
+                                mapView.zoomToBoundingBox(box, true, 150);
+                            }
+                        }
+
+                        Toast.makeText(requireContext(), "Destination set on map!", Toast.LENGTH_SHORT).show();
+
+                        if (!isMonitorRunning) {
+                            startAlarmMonitor();
+                        }
+
+                        if (setAlarmButton != null) {
+                            setAlarmButton.setText("Stop Alarm");
+                            setAlarmButton.setBackgroundResource(R.drawable.button_curved_red);
+                            setAlarmButton.setBackgroundTintList(ColorStateList.valueOf(Color.parseColor("#E53935")));
+                        }
+                        activeAlarmRadius = destRadius;
+                        updateRefreshButtonVisibility();
+
+                    } else {
+                        Toast.makeText(requireContext(), "Location not found", Toast.LENGTH_SHORT).show();
+                        if (setAlarmButton != null) {
+                            setAlarmButton.setText("Set Alarm");
+                        }
+                    }
+                });
+            }
+        });
     }
 
     @SuppressLint("UseCompatLoadingForDrawables")
